@@ -5,7 +5,7 @@ package main
 import "fmt"
 
 // Go does not allow type assertions or type switches directly on type
-// parameter values.  You must first convert to `any`, adding boilerplate
+// parameter values. You must first convert to `any`, adding boilerplate.
 
 // Optional interfaces that items in a pipeline might implement.
 type Validatable interface {
