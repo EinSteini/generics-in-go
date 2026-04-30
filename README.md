@@ -27,7 +27,7 @@ func (s Set[T]) Contains(value T) bool {
 ```
 Ein Problem ist natürlich, dass das ganze nicht mit eigenen Typen funktioniert.
 
-### 2. Algorithmische Code-Deduplizierung (Slice- & Map-Utilities)
+### 2. Code Deduplizierung bei Algorithmen
 Oft muss dieselbe Logik auf Slices oder Maps unterschiedlicher Datentypen angewendet werden. Anstatt für Datentypen jeweils eigene Schleifen zu schreiben, können generische Funktionen diese Arbeit zentralisieren.
 - **Beispiele:** `Filter`, `Map`, `Reduce`, `Sort`, `Reverse`, Extrahieren von Keys/Values aus Maps.
 
