@@ -48,6 +48,7 @@ m = GMin(a, b) // no type argument, still valid
 ```
 
 **Quellen:**
+
 - [An Introduction To Generics](https://go.dev/blog/intro-generics)
 
 ## 3. Kompilierung von Generics
@@ -145,10 +146,120 @@ const x = unwrap(42);
 
 **Quellen:**
 
-- [What Happens When You Use Generics in TypeScript Functions](https://medium.com/@AlexanderObregon/what-happens-when-you-use-generics-in-typescript-functions-df5c23085da0))
+- [What Happens When You Use Generics in TypeScript Functions](https://medium.com/@AlexanderObregon/what-happens-when-you-use-generics-in-typescript-functions-df5c23085da0)
 - [What is Type Erasure in TypeScript?](https://www.geeksforgeeks.org/typescript/what-is-type-erasure-in-typescript/)
 
-## 4. Bijektivität der Übersetzung: Go ↔ TypeScript
+## 4. Anwendungsbereiche von Generics in Go
+
+Generics können in Go an verschiedenen Stellen im Code eingesetzt werden. Dieser Abschnitt zeigt die grundlegenden Anwendungsbereiche mit Fokus auf die jeweilige Syntax.
+
+### Generische Funktionen
+
+Generische Funktionen eignen sich für Algorithmen, die unabhängig von konkreten Typ funktionieren sollen, z.B. Sortieren, Filtern oder Transformieren. Die Typparameter stehen dabei direkt hinter dem Funktionsnamen in eckigen Klammern `[]` und können innerhalb der Funktion wiederverwendet werden.
+
+```go
+func Swap[T any](a, b T) (T, T) {
+    return b, a
+}
+
+// Verwendung
+x, y := 1, 2
+x, y = Swap(x, y)
+
+a, b := "hello", "world"
+a, b = Swap(a, b)
+```
+
+### Generische Structs und Methoden
+
+Generische Structs werden für typsichere Datenstrukturen verwendet, die für beliebige Elementtypen funktionieren sollen, z.B. Stack, Queue oder ein typisierter Cache. Die Typparameter stehen hinter dem Typnamen und können im gesamten Struct und seinen Methoden verwendet werden. Methoden eines generischen Structs erhalten den Typparameter direkt über den Receiver:
+
+```go
+type Stack[T any] struct {
+    items []T
+}
+
+func (s *Stack[T]) Push(item T) {
+    s.items = append(s.items, item)
+}
+
+func (s *Stack[T]) Pop() T {
+    if len(s.items) == 0 {
+        var zero T
+        return zero
+    }
+    item := s.items[len(s.items)-1]
+    s.items = s.items[:len(s.items)-1]
+    return item
+}
+
+func (s *Stack[T]) Len() int  {
+  return len(s.items)
+}
+
+// Verwendung
+var s Stack[string]
+s.Push("hello")
+s.Push("world")
+fmt.Println(s.Pop()) // "world"
+```
+
+Methoden können dabei keine eigenen neuen Typparameter einführen, sie sind auf die Typparameter des Receiver-Typs beschränkt.
+
+### Generische Interfaces
+
+Interfaces können eigene Typparameter tragen und beschreiben damit einen typsicheren Vertrag für beliebige Elementtypen. Das ermöglicht Abstraktionen, bei denen die konkrete Implementierung austauschbar ist, z.B. für unterschiedliche Datenbankbackends:
+
+```go
+type Repository[T any] interface {
+    FindByID(id int) (T, error)
+    Save(entity T) error
+    Delete(id int) error
+}
+```
+
+In Go werden Interfaces implizit implementiert: Ein Struct erfüllt das Interface automatisch, sobald es alle geforderten Methoden für den konkreten Typ bereitstellt:
+
+```go
+type UserRepository struct { ... }
+
+func (r UserRepository) FindByID(id int) (User, error) { ... }
+func (r UserRepository) Save(u User) error             { ... }
+func (r UserRepository) Delete(id int) error           { ... }
+
+var repo Repository[User] = UserRepository{}  // gültig, da alle Methoden vorhanden
+```
+
+### Eingebaute Generics
+
+Neben den zuvor beschriebenen Anwendungbereichen von Generics, hat Go auch Generics direkt in die Sprache eingebaut. Beispiele hierfür sind Slices, Maps und Channels, die den Elementtypen als Typparameter verwenden und sich verhalten wie generische Structs:
+
+```go
+[]int          // entspricht etwa Slice[int]
+map[string]int // entspricht etwa Map[string, int]
+chan float64   // entspricht etwa Chan[float64]
+```
+
+Dazu kommen eingebaute Funktionen, die typunabhängig auf diesen Typen operieren:
+
+```go
+append(s []T, elems ...T) []T   // fügt Elemente an Slice an
+len(v T) int                    // Länge von Slice, Map, Channel, String, Array
+cap(v T) int                    // Kapazität von Slice, Channel, Array
+make(t T, size ...int) T        // alloziert Slice, Map oder Channel
+copy(dst, src []T) int          // kopiert Elemente zwischen Slices
+delete(m map[K]V, key K)        // entfernt Eintrag aus Map
+```
+
+**Quellen:**
+
+- [An Introduction To Generics](https://go.dev/blog/intro-generics)
+- [The Go Programming Language Specification – Type parameters](https://go.dev/ref/spec#Type_parameter_declarations)
+- [The Go Programming Language Specification – Built-in functions](https://go.dev/ref/spec#Built-in_functions)
+- [When To Use Generics](https://go.dev/blog/when-generics)
+- [Generics in Go](https://medium.com/@ksandeeptech07/generics-in-go-ffd5100ec642)
+
+## 5. Bijektivität der Übersetzung: Go ↔ TypeScript
 
 ### Motivation
 
