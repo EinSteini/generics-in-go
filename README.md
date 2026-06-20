@@ -2,19 +2,38 @@
 
 ## 1. Einleitung
 
-Generische Programmierung ermöglicht es, Algorithmen und Datenstrukturen typunabhängig zu formulieren, ohne dabei auf Typsicherheit zu verzichten. In diesem Projekt geht es darum Generics in Go zu verstehen und evaluieren, mit einem besonderen Fokus auf die Grenzen und Limitationen der Generics in Go. Desweiteren soll anhand konkreter Fallbeispiele ein Vergleich zu Generics in TypeScript ermöglicht werden.
+Generische Programmierung ermöglicht es, Algorithmen und Datenstrukturen typunabhängig zu formulieren, ohne dabei auf Typsicherheit zu verzichten. Statt für jeden Typ eine eigene Implementierung zu schreiben, können allgemeine und wiederverwendbare Lösungen geschaffen werden.
+
+Dieses Projekt vergleicht, wie Go und TypeScript dieses Konzept umsetzen, wo sich diese Umsetzungen unterscheiden, und ob eine KI-gestützte Übersetzung zwischen beiden Sprachen semantisch bijektiv ist.
 
 ## 2. Überblick: Generics in Go und TypeScript
-TODO:
- - Vergleiche generische Typparameter in Go versus Typescript
- - Am Anfang, welche generischen Primitive gibt es
- - Wo im Programmcode kommen generische Typparameter vor? Dazu kleine Tabelle. Kanonische Beispiele
- 
+
+Im Zentrum der generischen Programmierung steht das Konzept des **generischen Typparameters**. Hierbei handelt es sich um einen Platzhalter, typischerweise `T`, der anstelle eines Datentyps verwendet wird, bis ein konkreter Typ bei der Instanziierung gebunden wird:
+
+```go
+func Print[T any](value T)  // T ist ungebunden
+Print[int](42)              // T wird zu int gebunden
+```
+
+Während generische Typparameter als Feature in Go erst mit Version 1.18 (2022) und in TypeScript mit Version 2.0 (2016) eingeführt wurden, sind mehrere eingebaute Primitive beider Sprachen bereits generisch definiert, u.a.:
+
+| Sprache | Primitive |
+| --- | --- |
+| Go | `[]T` (Slice), `[N]T` (Array), `map[K]V`, `chan T`, `*T` (Pointer) |
+| TypeScript | `Array<T>`, `Map<K, V>`, `Set<T>`, `Promise<T>`, `Record<K, V>` |
+
+Das Konzept des generischen Typparameters ist damit in beiden Sprachen schon lange vertraut.
+
+Um eigene generische Typen und Funktionen zu definieren, teilen beide Sprachen zwei weitere Kernkonzepte:
+
+- **Type Constraints**: Schränken ein, welche Typen als Argumente für `T` zulässig sind.
+- **Typinferenz**: Typargumente müssen meist nicht explizit angegeben werden, sondern der Compiler kann diese aus den Funktionsargumenten ableiten.
+
+Die folgenden Abschnitte gehen weiter auf die genaue Syntax in den beiden Sprachen ein.
+
 ### Go
 
-In Go wurden Generics mit der Version 1.18 eingeführt, um den Code typunabhängiger und für mehrere Typen wiederverwendbar zu machen, während Code-Duplikationen vermieden und Typsicherheit gewährleistet werden. Typische Anwendungsfälle für Generics sind klassische Datenstrukturen wie ein Stack, eine List oder Funktionen für das Sortieren oder Mapping von Elementen.
-
-Die Generics basieren auf **Typparameteren**, die für Funktionen oder Typen definiert werden können. Diese Typparameter stellen Platzhalter für konkrete Typen dar und erlauben die Wiederverwendung des Codes. Die Typparameter werden dabei in eckigen Klammern `[]` angegeben und anstelle eines konkreten Datentyps wird typischerweise der Parameter `T` verwendet:
+Der generische Typparameter `T` wird in eckigen Klammern `[]` angegeben:
 
 ```go
 type Stack[T any] struct{ items []T }
@@ -22,33 +41,24 @@ type Stack[T any] struct{ items []T }
 func Print[T any](value T) { ... }
 ```
 
-Beim späteren Verwenden der Funktionen und Typen kann ein konkreter Datentyp dann als Typargument, wiederrum in eckigen Klammern, übergeben werden, um die Funktion (bzw. den Typen) zu instanziieren:
-
-```go
-var intStack Stack[int]
-```
-
-Ein weiteres Kernelement der Generics in Go sind **Type Constraints**, die festlegen, welche Typen als Argumente für generische Typparameter zulässig sind. Diese Constraints werden über Interfaces definert. Somit beschreiben Interfaces seit der Einführund der Generics nicht nur die benötigten Methoden für einen Typen, sondern sie können auch eine Menge erlaubter Typen angeben, das **Type Set**.
-
-Beispiel:
+Die **Type Constraints** werden in Go als Interface angegeben, direkt hinter dem Typparameter `T`:
 
 ```go
 type Ordered interface {
   Integer|Float|~string
 }
 
-func MinNamed[T Ordered](x, y T) T { ... }
-
-func MinLiteral[S ~[]E, E any]
+func Min[T Ordered](a, b T) T { ... }
 ```
 
-Neben Typparametern und Constraints wurde auch die Typinterferenz eingeführt, um die Verwendung von Generics einfacher zu gestalten. Durch die Typinterferenz müssen die Typargumente meist nicht explizit angegeben werden, sondern der Compiler kann die Typargumente aus den Funktionsargumenten ableiten:
+Bei der Instanziierung wird ein konkreter Datentyp als **Typargument** übergeben. Bei Funktionsaufrufen kann es durch Typinferenz auch weggelassen werden:
 
 ```go
-var a, b, m float64
-m = GMin[float64](a, b) // explicit type argument
+var intStack Stack[int]        // Typdefinition: T muss angegeben werden
 
-m = GMin(a, b) // no type argument, still valid
+var a, b float64
+m := Min[float64](a, b)        // Funktionsaufruf: explizites Typargument
+m := Min(a, b)                 // Funktionsaufruf: T wird zu float64 inferiert
 ```
 
 **Quellen:**
@@ -57,11 +67,52 @@ m = GMin(a, b) // no type argument, still valid
 
 ### TypeScript
 
-TODO
+Statt eckiger Klammern verwendet TypeScript spitze Klammern `<>` zur Deklaration von Typparameter `T`:
 
-### Vergleich
+```typescript
+class Stack<T> { items: T[] = [] }
 
-TODO Tabelle
+function print<T>(value: T): void { ... }
+```
+
+Type Constraints werden in TypeScript mit dem Schlüsselwort `extends` hinter dem Typparameter `T` angegeben:
+
+```typescript
+type Ordered = number | string
+
+function min<T extends Ordered>(a: T, b: T): T { ... }
+```
+
+Wie auch in Go kann das Typargument explizit übergeben oder bei Funktionsaufrufen durch Typinferenz weggelassen werden:
+
+```typescript
+const intStack = new Stack<number>(); // Typdefinition: T muss angegeben werden
+
+let a: number, b: number;
+min<number>(a, b); // Funktionsaufruf: explizites Typargument
+min(a, b);         // Funktionsaufruf: T wird zu number inferiert
+```
+
+TypeScript unterstützt zudem Standardwerte für Typparameter, z.B.x `type Stack<T = string>`. Dadurch wird das Typargument optional: Wird keines angegeben, nimmt `T` den Standardtyp `string` an.
+
+**Quellen:**
+
+- [TypeScript Handbook – Generics](https://www.typescriptlang.org/docs/handbook/2/generics.html)
+
+### Syntaktische Positionen eines generischen Typparameters
+
+Die folgende Tabelle fasst zusammen, an welchen Stellen im Programmcode ein generischer Typparameter `T` vorkommen kann und wie Go und TypeScript das jeweils ausdrücken:
+
+| Position im Code             | Go                                           | TypeScript                                       |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------------ |
+| Funktionsdefinition          | `func Min[T Ordered](a, b T) T`              | `function min<T extends Ordered>(a: T, b: T): T` |
+| Arrow Function               | —                                            | `const id = <T>(x: T): T => x`                   |
+| Typdefinition (Struct/Class) | `type Stack[T any] struct{ items []T }`      | `class Stack<T> { items: T[] = [] }`             |
+| Type Alias (ab Go 1.24)      | `type MyStack[T any] = Stack[T]`             | `type MyStack<T> = Stack<T>`                     |
+| Interface-Definition         | `type Container[T any] interface{ Get() T }` | `interface Container<T> { get(): T }`            |
+| Typparameter im Constraint   | `func Clone[S ~[]E, E any](s S) S`           | `function get<T, K extends keyof T>(o: T, k: K)` |
+| Methode (T vom Typ definiert)          | `func (s *Stack[T]) Push(v T)`               | `push(v: T): void`                               |
+| Methode (eigener Typparameter)          | nicht möglich                            | `map<U>(fn: (x: T) => U): U`                     |
 
 ## 3. Untersuchung der Bijektivität der Übersetzung: Go ↔ TypeScript
 
