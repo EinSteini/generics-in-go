@@ -17,10 +17,10 @@ Print[int](42)              // T wird zu int gebunden
 
 Während generische Typparameter als Feature in Go erst mit Version 1.18 (2022) und in TypeScript mit Version 2.0 (2016) eingeführt wurden, sind mehrere eingebaute Primitive beider Sprachen bereits generisch definiert, u.a.:
 
-| Sprache | Primitive |
-| --- | --- |
-| Go | `[]T` (Slice), `[N]T` (Array), `map[K]V`, `chan T`, `*T` (Pointer) |
-| TypeScript | `Array<T>`, `Map<K, V>`, `Set<T>`, `Promise<T>`, `Record<K, V>` |
+| Sprache    | Primitive                                                          |
+| ---------- | ------------------------------------------------------------------ |
+| Go         | `[]T` (Slice), `[N]T` (Array), `map[K]V`, `chan T`, `*T` (Pointer) |
+| TypeScript | `Array<T>`, `Map<K, V>`, `Set<T>`, `Promise<T>`, `Record<K, V>`    |
 
 Das Konzept des generischen Typparameters ist damit in beiden Sprachen schon lange vertraut.
 
@@ -90,7 +90,7 @@ const intStack = new Stack<number>(); // Typdefinition: T muss angegeben werden
 
 let a: number, b: number;
 min<number>(a, b); // Funktionsaufruf: explizites Typargument
-min(a, b);         // Funktionsaufruf: T wird zu number inferiert
+min(a, b); // Funktionsaufruf: T wird zu number inferiert
 ```
 
 TypeScript unterstützt zudem Standardwerte für Typparameter, z.B.x `type Stack<T = string>`. Dadurch wird das Typargument optional: Wird keines angegeben, nimmt `T` den Standardtyp `string` an.
@@ -103,35 +103,37 @@ TypeScript unterstützt zudem Standardwerte für Typparameter, z.B.x `type Stack
 
 Die folgende Tabelle fasst zusammen, an welchen Stellen im Programmcode ein generischer Typparameter `T` vorkommen kann und wie Go und TypeScript das jeweils ausdrücken:
 
-| Position im Code             | Go                                           | TypeScript                                       |
-| ---------------------------- | -------------------------------------------- | ------------------------------------------------ |
-| Funktionsdefinition          | `func Min[T Ordered](a, b T) T`              | `function min<T extends Ordered>(a: T, b: T): T` |
-| Arrow Function               | —                                            | `const id = <T>(x: T): T => x`                   |
-| Typdefinition (Struct/Class) | `type Stack[T any] struct{ items []T }`      | `class Stack<T> { items: T[] = [] }`             |
-| Type Alias (ab Go 1.24)      | `type MyStack[T any] = Stack[T]`             | `type MyStack<T> = Stack<T>`                     |
-| Interface-Definition         | `type Container[T any] interface{ Get() T }` | `interface Container<T> { get(): T }`            |
-| Typparameter im Constraint   | `func Clone[S ~[]E, E any](s S) S`           | `function get<T, K extends keyof T>(o: T, k: K)` |
-| Methode (T vom Typ definiert)          | `func (s *Stack[T]) Push(v T)`               | `push(v: T): void`                               |
-| Methode (eigener Typparameter)          | nicht möglich                            | `map<U>(fn: (x: T) => U): U`                     |
+| Position im Code                     | Go                                           | TypeScript                                       |
+| ------------------------------------ | -------------------------------------------- | ------------------------------------------------ |
+| Funktionsdefinition                  | `func Print[T any](v T)`                     | `function print<T>(v: T): void`                  |
+| Funktionsdefinition (mit Constraint) | `func Min[T Ordered](a, b T) T`              | `function min<T extends Ordered>(a: T, b: T): T` |
+| Arrow Function                       | —                                            | `const id = <T>(x: T): T => x`                   |
+| Typdefinition (Struct/Class)         | `type Stack[T any] struct{ items []T }`      | `class Stack<T> { items: T[] = [] }`             |
+| Type Alias (ab Go 1.24)              | `type MyStack[T any] = Stack[T]`             | `type MyStack<T> = Stack<T>`                     |
+| Interface-Definition                 | `type Container[T any] interface{ Get() T }` | `interface Container<T> { get(): T }`            |
+| T im Constraint von S                | `func Clone[S ~[]T, T any](s S) S`           | `function get<T, S extends keyof T>(o: T, k: S)` |
+| Methode (T vom Typ definiert)        | `func (s *Stack[T]) Push(v T)`               | `push(v: T): void`                               |
+| Methode (eigener Typparameter)       | nicht möglich                                | `map<U>(fn: (x: T) => U): U`                     |
 
 ## 3. Untersuchung der Bijektivität der Übersetzung: Go ↔ TypeScript
 
-### Motivation
+In Abschnitt 2 wurde gezeigt, dass Go und TypeScript generische Typparameter syntaktisch unterschiedlich verwenden, inhaltlich aber ähnliche Konzepte abbilden. Das wirft die Frage auf, ob eine Übersetzung zwischen beiden Sprachen bijektiv ist, d.h. ob eine Hin- und Rückübersetzung das ursprüngliche Ergebnis reproduzieren kann.
 
-Eine interessante Frage beim Vergleich zweier Typsysteme ist, ob eine Hin- und Rückübersetzung des Codes das ursprüngliche Ergebnis reproduziert.
+Ein semantisch und strukturell identisches Ergebnis deutet dabei auf eine hohe Äquivalez in der Umsetzung der generischen Programmierung beider Sprachen hin. Abweichungen hingegen offenbaren grundlegende Unterschiede in den Typsystemen.
 
-Wenn das Ergebnis semantisch und strukturell identisch zum Original ist, deutet das auf eine hohe Äquivalenz in der Umsetzung der Generics beider Sprachen hin. Weicht das Ergebnis ab, offenbart das Unterschiede in den Typsystemen.
+In diesem Abschnitt werden daher mehrere Testbeispiele dargestellt, um die Bijektivität der Übersetzung gestützt durch das LLM "Gemini Flash 2.5" zu untersuchen.
 
 ### Testbeispiele
 
-Für die folgenden Testbeispiele wird jeweils zuerst der Go-Quellcode gezeigt, dann eine Vermutung formuliert, welche Probleme bei der Übersetzung auftreten könnten.
+Für die folgenden Testbeispiele wird jeweils zuerst der Go-Quellcode gezeigt und eine Vermutung formuliert, welche Probleme bei der Übersetzung in TypeScript-Quellcode auftreten könnten.
 Anschließend wird das LLM mit dem unten definierten Prompt zur Übersetzung und Rückübersetzung aufgefordert.
-Zwischen jeder Anfrage wird der Kontext zurückgesetzt, damit das Modell sich nicht an vergangenen Nachrichten orientieren kann.
-Außerdem werden Kommentare entfernt, welche auf die ursprüngliche Version hinweisen.
+
+Zwischen jeder Anfrage wird der Kontext zurückgesetzt, damit das Modell sich nicht an den vergangenen Nachrichten orientieren kann.
+Desweiteren werden Kommentare entfernt, welche auf die ursprüngliche Version hinweisen könnten.
 
 ---
 
-#### Generische Primitive
+#### Generische Funktionsdefinition in Kombination mit generischen Primitiven
 
 ```go
 func Repeat[T any](v T, n int) []T {
@@ -148,147 +150,16 @@ func main() {
 }
 ```
 
-**Vermutung:** 
+**Vermutung:**
 Dieses Beispiel sollte problemlos übersetzbar sein.
-`any` entspricht direkt TypeScript's generischem `<T>` ohne Constraint.
-`make([]T, n)` wird zu `new Array<T>(n)` oder einem Array-Literal.
+
+- `any` entspricht direkt TypeScript's generischem `<T>` ohne Constraint.
+- `make([]T, n)` wird zu `new Array<T>(n)` oder einem Array-Literal.
+
 Die Hin- und Rückübersetzung sollte semantisch identisch sein.
 Lediglich `fmt.Println` vs. `console.log` und die Slice-Erzeugung unterscheiden sich syntaktisch.
 
-#### Type Sets vs. Type Union
-
-```go
-type Addable interface {
-	~int | ~float64 | ~string
-}
-
-func Add[T Addable](a, b T) T {
-	return a + b
-}
-
-type Meter float64
-
-func main() {
-	fmt.Println(Add(3, 4))         // 7
-	fmt.Println(Add("Go", "Lang")) // GoLang
-
-	var d1, d2 Meter = 10, 20
-	fmt.Println(Add(d1, d2))       // 30 (benannter Typ dank ~)
-}
-```
-
-**Vermutung:** 
-Hier werden mehrere Probleme erwartet:
-1. **Operator-Constraint:** 
-Go erlaubt `a + b` nur, weil das Type Set garantiert, dass alle enthaltenen Typen `+` unterstützen.
-TypeScript hat keine Möglichkeit, Operator-Unterstützung in einem Constraint auszudrücken.
-Das LLM wird vermutlich `T extends number | string` schreiben, aber TypeScript erlaubt `a + b` nicht generisch. 
-Es wird wahrscheinlich eine Type Assertion (`as any`) oder Overloads benötigen.
-2. **Tilde-Operator (`~`):** 
-Go's `~float64` erlaubt auch benannte Typen wie `Meter`. TypeScript hat kein Äquivalent und `type Meter = number` erzeugt keinen eigenständigen Typ, sondern nur ein Alias.
-Der Unterschied zwischen nominaler (`~`) und struktureller Typisierung geht verloren.
-3. **Rückübersetzung:** Aus TypeScript zurück nach Go wird der Tilde-Operator wahrscheinlich fehlen, und die `Meter`-Nutzung geht verloren.
-
-#### Call-by-Value & Pointer vs. Call-by-Reference
-
-```go
-func Swap[T any](a, b *T) {
-	*a, *b = *b, *a
-}
-
-func Double[T ~int | ~float64](v T) T {
-	return v * 2 // Original bleibt unverändert
-}
-
-func main() {
-	x, y := 10, 20
-	Swap(&x, &y)
-	fmt.Println(x, y) // 20 10
-
-	n := 5
-	fmt.Println(Double(n), n) // 10 5
-}
-```
-
-**Vermutung:** Dieses Beispiel ist problematisch für die Übersetzung:
-1. **Zeiger-Parameter (`*T`):** 
-TypeScript hat keine Zeiger.
-Das LLM muss entweder Wrapper-Objekte `{ value: T }` einführen oder die Signatur grundlegend ändern (z.B. Rückgabe eines Tupels statt In-Place-Mutation).
-2. **Semantischer Unterschied:** 
-In Go mutiert `Swap` die Originalvariablen über Zeiger.
-In TypeScript gibt es keine Möglichkeit, primitive Werte (`number`) by-reference zu übergeben.
-Die Übersetzung wird die Semantik entweder verändern oder einen Wrapper einführen, der im Original nicht existiert.
-3. **Rückübersetzung:** 
-Wenn das LLM einen Wrapper `{value: T}` in TypeScript erzeugt, wird die Rückübersetzung wahrscheinlich keinen Zeiger-Code rekonstruieren, sondern den Wrapper als Struct beibehalten.
-4. **Double:** Die Value-Semantik (`n` bleibt 5) ist in TypeScript automatisch gegeben, da primitive Typen ohnehin by-value übergeben werden. Hier sollte die Übersetzung korrekt sein.
-
-#### Klassen (Struct-Embedding)
-
-```go
-type Named struct {
-	Name string
-}
-
-type Box[T any] struct {
-	Named
-	Value T
-}
-
-func NewBox[T any](name string, v T) Box[T] {
-	return Box[T]{Named: Named{Name: name}, Value: v}
-}
-
-func main() {
-	b := NewBox("answer", 42)
-	fmt.Println(b.Name, b.Value) // answer 42
-}
-```
-
-**Vermutung:** Struct-Embedding hat kein direktes TypeScript-Äquivalent:
-1. **Embedding vs. Vererbung:** Das LLM muss zwischen `class Box<T> extends Named` (Vererbung) und Komposition (`name: Named`) wählen. Beides hat Nachteile – Vererbung ändert die Hierarchie, Komposition verliert den direkten Feldzugriff (`b.Name`).
-2. **Konstruktor:** Go's `NewBox`-Funktion wird wahrscheinlich zu einem `constructor` in einer Klasse. Die Rückübersetzung sollte das zu einer `NewBox`-Funktion rekonstruieren.
-3. **Direkter Feldzugriff:** In Go kann man `b.Name` schreiben (promoted field). Bei Komposition in TypeScript wäre es `b.named.name`. Das LLM wird vermutlich Vererbung wählen, um diesen Zugriff zu erhalten.
-
-#### Type Switch (if type == bool)
-
-```go
-type Dog struct{ Name string }
-
-func (d Dog) String() string { return d.Name }
-
-func Describe(v any) string {
-	switch val := v.(type) {
-	case bool:
-		if val { return "YES" }
-		return "NO"
-	case int:
-		return fmt.Sprintf("#%d", val)
-	case Dog:
-		return "Dog: " + val.Name
-	default:
-		return fmt.Sprint(v)
-	}
-}
-
-func main() {
-	fmt.Println(Describe(true))             // YES
-	fmt.Println(Describe(42))               // #42
-	fmt.Println(Describe(Dog{Name: "Rex"})) // Dog: Rex
-	fmt.Println(Describe("hello"))          // hello
-}
-```
-
-**Vermutung:** Der Type Switch ist ein interessanter Grenzfall:
-1. **Primitive Typen (`bool`, `int`):** Für diese kann das LLM `typeof v === "boolean"` verwenden – das funktioniert.
-2. **Struct-Typ (`Dog`):** Hier versagt `typeof`, da es nur `"object"` liefert. Das LLM muss `instanceof` (erfordert Klassen) oder ein Discriminator-Feld einführen.
-3. **Nominale Unterscheidung:**
-In Go sind Structs nominal verschieden. Zwei Structs mit gleichen Feldern sind verschiedene Typen. In TypeScript sind strukturell identische Typen austauschbar; nur `instanceof` unterscheidet sie zur Laufzeit.
-4. **Rückübersetzung:** `typeof`-Checks für Primitive werden korrekt rekonstruiert. Aber `instanceof Dog` wird wahrscheinlich nicht zum originalen Struct-Pattern zurückübersetzt, sondern eine Klasse beibehalten.
-
-### Ergebnisse (Gemini Flash 2.5)
-
-#### Test 4: Generische Primitive
-
+#### Ergebnisse
 **Go → TypeScript:**
 
 ```typescript
@@ -321,13 +192,50 @@ func main() {
 }
 ```
 
-**Beobachtungen:**
-1. Wie vermutet ist die Übersetzung nahezu bijektiv. Die Semantik ist vollständig erhalten.
-2. Syntaktischer Unterschied: `for i := range result` (Original) → `for i := 0; i < n; i++` (Rückübersetzung). Funktional identisch.
+**Beobachtungen:** Wie vermutet ist die Übersetzung nahezu bijektiv:
+
+1. Die Semantik ist vollständig erhalten.
+2. Syntaktischer Unterschied: `for i := range result` (Original) → `for i := 0; i < n; i++` (Rückübersetzung). Funktional jedoch identisch.
 
 ---
 
-#### Type Sets vs. Type Union
+#### Type Sets in Go vs. Type Union in TypeScript
+
+```go
+type Addable interface {
+	~int | ~float64 | ~string
+}
+
+func Add[T Addable](a, b T) T {
+	return a + b
+}
+
+type Meter float64
+
+func main() {
+	fmt.Println(Add(3, 4))         // 7
+	fmt.Println(Add("Go", "Lang")) // GoLang
+
+	var d1, d2 Meter = 10, 20
+	fmt.Println(Add(d1, d2))       // 30 (benannter Typ dank ~)
+}
+```
+
+**Vermutung:**
+Hier werden mehrere Probleme erwartet:
+
+1. **Operator-Constraint:**
+   Go erlaubt `a + b` nur, weil das Type Set garantiert, dass alle enthaltenen Typen `+` unterstützen. Dabei wird `T` zur Compile-Zeit an einen einzigen konkreten Typ gebunden.
+
+   TypeScript hat keine Möglichkeit, Operator-Unterstützung in einem Constraint auszudrücken.
+   Das LLM wird vermutlich `T extends number | string` schreiben, aber dies bedeutet nur, dass `T` einer der beiden Typen sein kann. TypeScript muss daher davon ausgehen, dass `a` und `b` unterschiedliche Typen haben könnten, weshalb es `a + b` nicht generisch erlaubt.
+   Das LLM wird daher vermutlich eine Type Assertion (`as any`) oder Overloads benötigen.
+2. **Tilde-Operator (`~`):**
+   Go's `~float64` erlaubt auch benannte Typen wie `Meter` für den Typparameter zu initialisieren. TypeScript hat kein Äquivalent und `type Meter = number` erzeugt keinen eigenständigen Typ, sondern nur ein Alias.
+   Der Unterschied zwischen nominaler (`~`) und struktureller Typisierung geht verloren.
+3. **Rückübersetzung:** Aus TypeScript zurück nach Go wird der Tilde-Operator wahrscheinlich fehlen, und die `Meter`-Nutzung geht verloren.
+
+#### Ergebnisse
 
 **Go → TypeScript:**
 
@@ -341,12 +249,12 @@ function Add<T extends Addable>(a: T, b: T): T {
 type Meter = number;
 
 function main() {
-  console.log(Add(3, 4));         // 7
+  console.log(Add(3, 4)); // 7
   console.log(Add("Go", "Lang")); // GoLang
 
   const d1: Meter = 10;
   const d2: Meter = 20;
-  console.log(Add(d1, d2));       // 30
+  console.log(Add(d1, d2)); // 30
 }
 
 main();
@@ -375,7 +283,8 @@ func main() {
 ```
 
 **Beobachtungen:**
-1. **TypeScript-Code kompiliert nicht:** `return a + b` mit `T extends number | string` erzeugt einen TypeScript-Fehler.
+
+1. **TypeScript-Code kompiliert nicht:** `return a + b` mit `T extends number | string` erzeugt einen TypeScript-Fehler, da `a` und `b` unterschiedliche Typen sein könnten und somit der Rückgabetyp `T`nicht garantiert werden kann.
 2. **Tilde in Rückübersetzung vorhanden:** Überraschenderweise fügt das LLM bei der Rückübersetzung `~` hinzu (`~int | ~float32 | ~float64 | ~string`), obwohl TypeScript dieses Konzept nicht hat. Das LLM hat hier offenbar Go-Idiome angewandt.
 3. **`Meter` wird zu `int` statt `float64`:** Im Original ist `type Meter float64`, die Rückübersetzung erzeugt `type Meter int`. TypeScript's `number` ist nicht eindeutig auf `int` oder `float64` abbildbar.
 4. **Zusätzlicher Typ `float32`:** Die Rückübersetzung fügt `~float32` zum Constraint hinzu, das im Original nicht existiert.
@@ -383,7 +292,42 @@ func main() {
 
 ---
 
-#### Call-by-Value & Pointer
+#### Call-by-Value & Pointer vs. Call-by-Reference
+TODO Call-by-Reference kommt hier nicht so wirklich drin vor oder?
+```go
+func Swap[T any](a, b *T) {
+	*a, *b = *b, *a
+}
+
+func Double[T ~int | ~float64](v T) T {
+	return v * 2 // Original bleibt unverändert
+}
+
+func main() {
+	x, y := 10, 20
+	Swap(&x, &y)
+	fmt.Println(x, y) // 20 10
+
+	n := 5
+	fmt.Println(Double(n), n) // 10 5
+}
+```
+
+**Vermutung:** Dieses Beispiel ist problematisch für die Übersetzung:
+
+1. **Zeiger-Parameter (`*T`):**
+   TypeScript hat keine Zeiger.
+   Das LLM muss entweder Wrapper-Objekte `{ value: T }` einführen oder die Signatur grundlegend ändern (z.B. Rückgabe eines Tupels statt In-Place-Mutation).
+2. **Semantischer Unterschied:**
+   In Go mutiert `Swap` die Originalvariablen über Zeiger.
+   In TypeScript gibt es keine Möglichkeit, primitive Werte (`number`) by-reference zu übergeben.
+   Die Übersetzung wird die Semantik entweder verändern oder einen Wrapper einführen, der im Original nicht existiert.
+3. **Rückübersetzung:**
+   Wenn das LLM einen Wrapper `{value: T}` in TypeScript erzeugt, wird die Rückübersetzung wahrscheinlich keinen Zeiger-Code rekonstruieren, sondern den Wrapper als Struct beibehalten.
+4. **Double:** Die Value-Semantik (`n` bleibt 5) ist in TypeScript automatisch gegeben, da primitive Typen ohnehin by-value übergeben werden. Hier sollte die Übersetzung korrekt sein.
+
+
+#### Ergebnisse
 
 **Go → TypeScript:**
 
@@ -441,6 +385,7 @@ func main() {
 ```
 
 **Beobachtungen:**
+
 1. **Wrapper-Objekt bestätigt:** Wie vermutet führt das LLM einen `Ptr<T>`-Typ mit `value`-Feld ein, da TypeScript keine Zeiger hat.
 2. **Semantik verändert:** Im Original ist `Swap[T any](a, b *T)` – direkte Zeiger auf Werte. Die Rückübersetzung erzeugt `Swap[T any](a, b *Ptr[T])` – Zeiger auf Wrapper-Structs. Der Aufrufer muss nun `Ptr`-Objekte erstellen statt einfach `&x` zu schreiben.
 3. **Nicht bijektiv:** Statt `*T` entsteht `*Ptr[T]` – ein strukturell anderes Programm.
@@ -450,6 +395,36 @@ func main() {
 ---
 
 #### Klassen (Struct-Embedding)
+
+```go
+type Named struct {
+	Name string
+}
+
+type Box[T any] struct {
+	Named
+	Value T
+}
+
+func NewBox[T any](name string, v T) Box[T] {
+	return Box[T]{Named: Named{Name: name}, Value: v}
+}
+
+func main() {
+	b := NewBox("answer", 42)
+	fmt.Println(b.Name, b.Value) // answer 42
+}
+```
+
+TODO: Das hier drunter noch besser als richtige Vermutungen fomulieren
+
+**Vermutung:** Struct-Embedding hat kein direktes TypeScript-Äquivalent:
+
+1. **Embedding vs. Vererbung:** Das LLM muss zwischen `class Box<T> extends Named` (Vererbung) und Komposition (`name: Named`) wählen. Beides hat Nachteile: Vererbung ändert die Hierarchie, Komposition verliert den direkten Feldzugriff (`b.Name`).
+2. **Konstruktor:** Go's `NewBox`-Funktion wird wahrscheinlich zu einem `constructor` in einer TypeScript Klasse. Die Rückübersetzung sollte das zu einer `NewBox`-Funktion rekonstruieren.
+3. **Direkter Feldzugriff:** In Go kann man `b.Name` schreiben (promoted field). Bei Komposition in TypeScript wäre es `b.named.name`. Das LLM wird vermutlich Vererbung wählen, um diesen Zugriff zu erhalten.
+
+#### Ergebnisse
 
 **Go → TypeScript:**
 
@@ -506,43 +481,84 @@ func main() {
 }
 ```
 
-**Beobachtungen:**
+TODO stand beim ersten nicht auch "nahezu" bijektiv? ist das nicht quasi das gleiche wie "fast perfekt"?
+**Beobachtungen:** Dies ist das einzige Beispiel mit fast perfekter Bijektivität:
+
 1. **Vererbung gewählt:** Wie vermutet wählt das LLM `extends Named` statt Komposition, um den direkten Feldzugriff `b.Name` zu erhalten.
-2. **Rückübersetzung nahezu identisch:** Das Embedding wird korrekt rekonstruiert. `Named` wird wieder eingebettet, `NewBox` bleibt eine Funktion. Dies ist das einzige Beispiel mit fast perfekter Bijektivität.
+2. **Rückübersetzung nahezu identisch:** Das Embedding wird korrekt rekonstruiert. `Named` wird wieder eingebettet, `NewBox` bleibt eine Funktion.
 
 ---
 
-#### Type Switch
+#### Type Switch (if type == bool)
+
+```go
+type Dog struct{ Name string }
+
+func (d Dog) String() string { return d.Name }
+
+func Describe(v any) string {
+	switch val := v.(type) {
+	case bool:
+		if val { return "YES" }
+		return "NO"
+	case int:
+		return fmt.Sprintf("#%d", val)
+	case Dog:
+		return "Dog: " + val.Name
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+func main() {
+	fmt.Println(Describe(true))             // YES
+	fmt.Println(Describe(42))               // #42
+	fmt.Println(Describe(Dog{Name: "Rex"})) // Dog: Rex
+	fmt.Println(Describe("hello"))          // hello
+}
+```
+
+**Vermutung:** Der Type Switch ist ein interessanter Grenzfall:
+
+1. **Primitive Typen (`bool`, `int`):** Für diese kann das LLM `typeof v === "boolean"` verwenden – das funktioniert.
+2. **Struct-Typ (`Dog`):** Hier versagt `typeof`, da es nur `"object"` liefert. Das LLM muss `instanceof` (erfordert Klassen) oder ein Discriminator-Feld einführen.
+3. **Nominale Unterscheidung:**
+   In Go sind Structs nominal verschieden. Zwei Structs mit gleichen Feldern sind verschiedene Typen. In TypeScript sind strukturell identische Typen austauschbar; nur `instanceof` unterscheidet sie zur Laufzeit.
+4. **Rückübersetzung:** `typeof`-Checks für Primitive werden korrekt rekonstruiert. Aber `instanceof Dog` wird wahrscheinlich nicht zum originalen Struct-Pattern zurückübersetzt, sondern eine Klasse beibehalten.
+
+#### Ergebnisse
 
 **Go → TypeScript:**
 
 ```typescript
 class Dog {
-    constructor(public Name: string) {}
-    toString(): string {
-        return this.Name;
-    }
+  constructor(public Name: string) {}
+  toString(): string {
+    return this.Name;
+  }
 }
 
 function Describe(v: unknown): string {
-    if (typeof v === 'boolean') {
-        if (v) { return "YES"; }
-        return "NO";
+  if (typeof v === "boolean") {
+    if (v) {
+      return "YES";
     }
-    if (typeof v === 'number' && Number.isInteger(v)) {
-        return `#${v}`;
-    }
-    if (v instanceof Dog) {
-        return `Dog: ${v.Name}`;
-    }
-    return String(v);
+    return "NO";
+  }
+  if (typeof v === "number" && Number.isInteger(v)) {
+    return `#${v}`;
+  }
+  if (v instanceof Dog) {
+    return `Dog: ${v.Name}`;
+  }
+  return String(v);
 }
 
 function main() {
-    console.log(Describe(true));
-    console.log(Describe(42));
-    console.log(Describe(new Dog("Rex")));
-    console.log(Describe("hello"));
+  console.log(Describe(true));
+  console.log(Describe(42));
+  console.log(Describe(new Dog("Rex")));
+  console.log(Describe("hello"));
 }
 
 main();
@@ -595,6 +611,7 @@ func main() {
 ```
 
 **Beobachtungen:**
+
 1. **`typeof` für Primitive:** Wie vermutet verwendet das LLM `typeof v === "boolean"` und `typeof v === "number"`.
 2. **`instanceof` für Struct:** Wie vermutet wird `instanceof Dog` für den Struct-Typ verwendet.
 3. **`case *Dog` statt `case Dog`:** Die Rückübersetzung erzeugt `case *Dog` (Pointer) und `NewDog` gibt `*Dog` zurück. Das Original verwendet `case Dog` (Value-Typ) und erzeugt Dogs als `Dog{Name: "Rex"}`. Dies ändert die Aufruf-Semantik.
@@ -607,13 +624,13 @@ func main() {
 
 ### Zusammenfassung der Ergebnisse
 
-| Testfall | Bijektiv? | Hauptproblem |
-|----------|-----------|--------------|
-| Generische Primitive | ✅ Ja | Nur syntaktische Unterschiede (Loop-Stil) |
-| Type Sets | ❌ Nein | TS-Code kompiliert nicht (`a + b`), `Meter` wird zu `int` statt `float64` |
-| Pointer/Call-by-value | ❌ Nein | Wrapper-Struct `Ptr[T]` statt Zeiger, externe Abhängigkeit eingefügt |
-| Struct-Embedding | ✅ Fast | Nahezu identisch, nur Default-Parameter-Unterschied |
-| Type Switch | ❌ Nein | `*Dog` statt `Dog`, Integer-Explosion, `Number.isInteger`-Logik hinzugefügt |
+| Testfall              | Bijektiv? | Hauptproblem                                                                |
+| --------------------- | --------- | --------------------------------------------------------------------------- |
+| Generische Primitive  | ✅ Ja     | Nur syntaktische Unterschiede (Loop-Stil)                                   |
+| Type Sets             | ❌ Nein   | TS-Code kompiliert nicht (`a + b`), `Meter` wird zu `int` statt `float64`   |
+| Pointer/Call-by-value | ❌ Nein   | Wrapper-Struct `Ptr[T]` statt Zeiger, externe Abhängigkeit eingefügt        |
+| Struct-Embedding      | ✅ Fast   | Nahezu identisch, nur Default-Parameter-Unterschied                         |
+| Type Switch           | ❌ Nein   | `*Dog` statt `Dog`, Integer-Explosion, `Number.isInteger`-Logik hinzugefügt |
 
 ### Prompt für den Test
 
@@ -642,11 +659,14 @@ func main() {
 Die Übersetzung zwischen Go und TypeScript Generics ist **nicht bijektiv** im strengen Sinne. Die Experimente zeigen ein klares Muster:
 
 **Wann klappt's?**
+TODO die nummern hier passen nicht zu den oben beschriebenen beispielen (also da sind keine 7 stück und das erste gehört zu test 4)
+
 - Einfache generische Funktionen mit `any`-Constraint sind nahezu perfekt übersetzbar (Test 4).
 - Struct-Embedding ↔ Klassen-Vererbung funktioniert gut, solange keine Pointer-/Value-Semantik involviert ist (Test 7).
 - Die grundlegende Struktur (Typparameter, Funktionssignaturen, generische Container) wird in allen Fällen korrekt übertragen.
 
 **Wann geht's schief?**
+
 - **Type Sets mit Operatoren**: TypeScript kann Operator-Constraints nicht ausdrücken. Der generierte Code kompiliert teilweise nicht, und der Tilde-Operator (`~`) sowie benannte Typen gehen bei der Hinübersetzung verloren.
 - **Zeiger-Semantik**: Da TypeScript keine Zeiger hat, entstehen Wrapper-Structs, die bei der Rückübersetzung nicht zu einfachen Zeigern rekonstruiert werden. Die Aufruf-Semantik ändert sich grundlegend.
 - **Type Switches mit Struct-Typen**: Die Unterschiede zwischen Go's nominalem Typsystem und TypeScript's strukturellem Typsystem werden sichtbar. `typeof` funktioniert nur für Primitive; für Structs braucht es `instanceof`, was zu `*Dog` statt `Dog` führt. Zusätzlich erzeugt die Rückübersetzung eine Explosion an Integer-Cases, da TypeScript's `number` nicht eindeutig auf einen Go-Typ abbildbar ist.
