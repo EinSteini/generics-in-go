@@ -637,12 +637,18 @@ func main() {
 > [TypeScript-Code]
 > ```
 
-### Verwandte Arbeiten
-TODO
-
 ### Fazit
 
-TODO: Wann geht's schief? Wann klappt's?
-Generell Allgeimeiner: In welchem Fall sind die Abbildungen bijektiv?
+Die Übersetzung zwischen Go und TypeScript Generics ist **nicht bijektiv** im strengen Sinne. Die Experimente zeigen ein klares Muster:
 
-Die Übersetzung zwischen Go und TypeScript Generics ist nicht bijektiv im strengen Sinne. Während die generischen Konzepte (Typparameter, Constraints, generische Funktionen und Typen) eine gute Korrespondenz aufweisen, führen die fundamentalen Unterschiede der Sprachen (nominale vs. strukturelle Typisierung, Pointer-Semantik) zu unvermeidbaren Abweichungen beim Roundtrip. Ein LLM veruscht, die semantische Intention zu bewahren, aber der resultierende Code wird warscheinlich syntaktisch vom Original abweichen.
+**Wann klappt's?**
+- Einfache generische Funktionen mit `any`-Constraint sind nahezu perfekt übersetzbar (Test 4).
+- Struct-Embedding ↔ Klassen-Vererbung funktioniert gut, solange keine Pointer-/Value-Semantik involviert ist (Test 7).
+- Die grundlegende Struktur (Typparameter, Funktionssignaturen, generische Container) wird in allen Fällen korrekt übertragen.
+
+**Wann geht's schief?**
+- **Type Sets mit Operatoren**: TypeScript kann Operator-Constraints nicht ausdrücken. Der generierte Code kompiliert teilweise nicht, und der Tilde-Operator (`~`) sowie benannte Typen gehen bei der Hinübersetzung verloren.
+- **Zeiger-Semantik**: Da TypeScript keine Zeiger hat, entstehen Wrapper-Structs, die bei der Rückübersetzung nicht zu einfachen Zeigern rekonstruiert werden. Die Aufruf-Semantik ändert sich grundlegend.
+- **Type Switches mit Struct-Typen**: Die Unterschiede zwischen Go's nominalem Typsystem und TypeScript's strukturellem Typsystem werden sichtbar. `typeof` funktioniert nur für Primitive; für Structs braucht es `instanceof`, was zu `*Dog` statt `Dog` führt. Zusätzlich erzeugt die Rückübersetzung eine Explosion an Integer-Cases, da TypeScript's `number` nicht eindeutig auf einen Go-Typ abbildbar ist.
+
+**Allgemein:** Die Abbildung ist bijektiv, wenn der Code ausschließlich Konzepte nutzt, die in beiden Sprachen strukturelle Äquivalente haben: generische Funktionen ohne Operator-Nutzung, einfache Constraints, und Datenstrukturen ohne Zeiger-Semantik. Sobald sprachspezifische Features involviert sind (Type Sets mit `~`, Zeiger, nominale Typunterscheidung), ist die Rückübersetzung nicht mehr äquivalent zum Original.
