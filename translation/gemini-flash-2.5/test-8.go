@@ -1,94 +1,66 @@
 package main
 
 import (
-	"fmt"
-	"math"
+	"fmt" // Benötigt für das Drucken auf die Konsole und die String-Formatierung
 )
 
-// Dog class
-// Entspricht der TypeScript-Klasse Dog.
-type Dog struct {
-	Name string
+// Container ist eine generische Struktur, die ein Slice von Elementen vom Typ T enthält.
+// Entspricht der TypeScript-Klasse 'class Container<T>'.
+type Container[T any] struct {
+	Items []T // Öffentliches Feld, entspricht 'public items: T[]'
 }
 
-// NewDog ist eine konstruktorähnliche Funktion für Dog.
-// Entspricht dem TypeScript-Konstruktor `constructor(public Name: string)`.
-func NewDog(name string) *Dog {
-	return &Dog{Name: name}
-}
-
-// String implementiert das fmt.Stringer-Interface für Dog.
-// Entspricht der TypeScript-Methode `toString(): string`.
-func (d *Dog) String() string {
-	return d.Name
-}
-
-// Describe-Funktion
-// Entspricht der TypeScript-Funktion Describe(v: unknown): string.
-// Der Typ 'any' (Go 1.18+) ist das Äquivalent zu TypeScript's 'unknown'.
-func Describe(v any) string {
-	switch val := v.(type) {
-	case bool: // Entspricht `typeof v === 'boolean'`
-		if val {
-			return "YES"
-		}
-		return "NO"
-
-	// Entspricht `typeof v === 'number' && Number.isInteger(v)`.
-	// Go erfordert die Prüfung spezifischer Integer-Typen.
-	case int:
-		return fmt.Sprintf("#%d", val)
-	case int8:
-		return fmt.Sprintf("#%d", val)
-	case int16:
-		return fmt.Sprintf("#%d", val)
-	case int32:
-		return fmt.Sprintf("#%d", val)
-	case int64:
-		return fmt.Sprintf("#%d", val)
-	case uint:
-		return fmt.Sprintf("#%d", val)
-	case uint8:
-		return fmt.Sprintf("#%d", val)
-	case uint16:
-		return fmt.Sprintf("#%d", val)
-	case uint32:
-		return fmt.Sprintf("#%d", val)
-	case uint64:
-		return fmt.Sprintf("#%d", val)
-	case uintptr: // Weniger häufig für Benutzerdaten, aber ein Integer-Typ.
-		return fmt.Sprintf("#%d", val)
-
-	// Behandelt Gleitkomma-Typen, wenn sie einen Integer darstellen.
-	// TypeScript's `Number.isInteger` funktioniert auch für Gleitkommazahlen wie 42.0.
-	case float32:
-		// Prüft, ob der float32-Wert keinen Nachkommaanteil hat.
-		if val == float32(math.Trunc(float64(val))) {
-			return fmt.Sprintf("#%d", int32(val)) // Konvertiert zu int32 für die Formatierung
-		}
-		// Wenn es keine Integer-Gleitkommazahl ist, fällt es in den Default-Fall.
-	case float64:
-		// Prüft, ob der float64-Wert keinen Nachkommaanteil hat.
-		if val == math.Trunc(val) { // `math.Trunc` gibt den Integer-Teil der Gleitkommazahl zurück.
-			return fmt.Sprintf("#%d", int64(val)) // Konvertiert zu int64 für die Formatierung
-		}
-		// Wenn es keine Integer-Gleitkommazahl ist, fällt es in den Default-Fall.
-
-	case *Dog: // Entspricht `v instanceof Dog`
-		return fmt.Sprintf("Dog: %s", val.Name)
-
-	default: // Entspricht `String(v)` für jeden anderen Typ in TypeScript.
-		return fmt.Sprint(v)
+// NewContainer erstellt einen neuen Container mit den gegebenen Elementen.
+// Dies dient als Äquivalent zum Konstruktor der TypeScript-Klasse.
+// Das Standard-leere Array aus dem TypeScript-Konstruktor wird durch
+// die Nil-Slice-Initialisierung von Go behandelt, falls keine Elemente bereitgestellt werden.
+func NewContainer[T any](items []T) Container[T] {
+	if items == nil {
+		// Wenn keine Elemente bereitgestellt werden, initialisiere mit einem leeren Slice
+		// für Konsistenz, obwohl ein Nil-Slice auch funktionieren würde.
+		return Container[T]{Items: []T{}}
 	}
+	return Container[T]{Items: items}
 }
 
+// Map wendet eine Funktion 'f' auf jedes Element im Eingabe-Container 'c' an
+// und gibt einen neuen Container mit den Ergebnissen zurück.
+// Entspricht der TypeScript-Funktion 'function Map<T, U>(c: Container<T>, f: (value: T) => U): Container<U>'.
+func Map[T, U any](c Container[T], f func(value T) U) Container[U] {
+	// Erstelle einen neuen Slice zum Speichern der gemappten Ergebnisse, mit der gleichen Länge wie die Eingabe.
+	// Entspricht 'const resultItems: U[] = new Array<U>(c.items.length);'
+	resultItems := make([]U, len(c.Items))
+
+	// Erstelle einen neuen Container für die Ergebnisse, initialisiert mit dem resultItems-Slice.
+	// Entspricht 'const result = new Container<U>(resultItems);'
+	result := NewContainer(resultItems) // Verwende NewContainer für Konsistenz
+
+	// Iteriere über die Elemente im Eingabe-Container und wende die Mapping-Funktion an.
+	// Entspricht der TypeScript-For-Schleife.
+	for i := 0; i < len(c.Items); i++ {
+		result.Items[i] = f(c.Items[i])
+	}
+
+	return result
+}
+
+// mainGoEquivalent demonstriert die Verwendung von Container und Map in Go.
+// Entspricht der TypeScript-Funktion 'function mainGoEquivalent(): void'.
+func mainGoEquivalent() {
+	// Erstelle einen neuen Container von Integern.
+	// Entspricht 'const nums = new Container<number>([1, 2, 3]);'
+	nums := NewContainer([]int{1, 2, 3})
+	fmt.Println("Original numbers container:", nums.Items) // Ausgabe: [1 2 3]
+
+	// Mappe die Zahlen zu Strings, indem "!" an jede angehängt wird.
+	// Entspricht 'const strs = Map(nums, (n: number) => `${n}!`);'
+	strs := Map(nums, func(n int) string {
+		return fmt.Sprintf("%d!", n)
+	})
+	fmt.Println("Mapped strings container:", strs.Items) // Erwartete Ausgabe: [1! 2! 3!]
+}
+
+// main ist der Einstiegspunkt für das Go-Programm.
 func main() {
-	// Entspricht der TypeScript-Funktion `main`.
-	fmt.Println(Describe(true))          // Erwartet: YES
-	fmt.Println(Describe(42))            // Erwartet: #42
-	fmt.Println(Describe(42.0))          // Entspricht Number.isInteger(42.0) in TS, erwartet: #42
-	fmt.Println(Describe(4.5))           // Entspricht String(4.5) in TS, erwartet: 4.5
-	fmt.Println(Describe(NewDog("Rex"))) // Entspricht new Dog("Rex"), erwartet: Dog: Rex
-	fmt.Println(Describe("hello"))       // Erwartet: hello
-	fmt.Println(Describe([]int{1, 2}))   // Beispiel für den Default-Fall, erwartet: [1 2]
+	mainGoEquivalent()
 }

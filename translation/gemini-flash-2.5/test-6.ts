@@ -1,79 +1,73 @@
+// type Pair[T any] struct {
+//   First, Second T
+// }
 /**
- * Typ `Ptr<T>` ahmt das Zeigerverhalten von Go für veränderliche Werte nach.
- * Für primitive Typen wie `number` oder `string` müssen diese in `{ value: T }`
- * eingepackt werden, um eine In-Place-Modifikation zu ermöglichen.
- * Bei Objekten können Sie den Objektwert direkt an `value` zuweisen,
- * wenn dessen Eigenschaften mutiert werden sollen, oder das gesamte Objekt
- * als Wert in `Ptr<T>` verpacken, um es zu tauschen.
+ * Definiert eine generische Pair-Struktur mit zwei Feldern, First und Second,
+ * beide vom Typ T.
+ * Entspricht Go's `type Pair[T any] struct { First, Second T }`.
  */
-type Ptr<T> = { value: T };
-
-/**
- * Tauscht die Werte, auf die 'a' und 'b' verweisen.
- *
- * In Go funktioniert dies für jeden Typ T, indem Zeiger (`*T`) übergeben werden.
- * In TypeScript müssen für primitive Typen (number, string, boolean),
- * um den gleichen In-Place-Mutationseffekt zu erzielen, diese in ein Objekt
- * (`Ptr<T>`) eingepackt werden.
- * Bei nicht-primitiven Objekten (Arrays, benutzerdefinierte Objekte)
- * würden 'a' und 'b' bereits per Referenz übergeben.
- * Wenn das Ziel ist, die Objekte selbst zu tauschen, ist `Ptr<T>` erforderlich.
- *
- * Beispielverwendung mit Primitiven:
- * let x = { value: 10 };
- * let y = { value: 20 };
- * Swap(x, y);
- * console.log(x.value, y.value); // 20 10
- *
- * Beispielverwendung mit Objekten:
- * let obj1 = { value: { name: "Alice" } };
- * let obj2 = { value: { name: "Bob" } };
- * Swap(obj1, obj2);
- * console.log(obj1.value, obj2.value); // { name: "Bob" } { name: "Alice" }
- */
-function Swap<T>(a: Ptr<T>, b: Ptr<T>): void {
-  const temp = a.value;
-  a.value = b.value;
-  b.value = temp;
+interface Pair<T> {
+  First: T;
+  Second: T;
 }
 
+// func SwapWithCopy[T any](p Pair[T]) Pair[T] {
+//   p.First, p.Second = p.Second, p.First
+//   return p
+// }
 /**
- * Verdoppelt den Eingabewert.
- *
- * In Go ist der Typparameter T auf zugrunde liegende Integer- (`~int`)
- * oder Float64-Typen (`~float64`) beschränkt.
- * In TypeScript deckt `number` sowohl Integer- als auch Gleitkommazahlen ab.
- * Die `extends number`-Constraint stellt sicher, dass Multiplikation eine
- * gültige Operation für Typ T ist. Der Rückgabetyp wird zu T gecastet,
- * um die ursprüngliche Typspezifität zu erhalten, insbesondere wenn T
- * ein numerischer Literal-Typ ist.
- *
- * @param v Der zu verdoppelnde numerische Wert.
- * @returns Der verdoppelte Wert, wobei der ursprüngliche Typ `T` beibehalten wird.
+ * Tauscht die Felder First und Second eines Paares und gibt ein *neues* Paar
+ * mit den getauschten Werten zurück.
+ * Das ursprüngliche als Argument übergebene Pair bleibt unverändert,
+ * was Go's Pass-by-Value-Verhalten für Strukturen simuliert.
+ * @param p Das zu tauschende Paar.
+ * @returns Ein neues Paar mit getauschten First- und Second-Werten.
  */
-function Double<T extends number>(v: T): T {
-  return (v * 2) as T; // Original bleibt unverändert
+function SwapWithCopy<T>(p: Pair<T>): Pair<T> {
+  // In Go werden Strukturen by Value übergeben. Eine Modifikation von 'p'
+  // innerhalb der Funktion würde nur eine lokale Kopie modifizieren.
+  // Wir simulieren dies, indem wir ein *neues* Objekt mit den getauschten
+  // Werten erstellen und zurückgeben, wodurch das ursprüngliche 'p' unberührt bleibt.
+  return { First: p.Second, Second: p.First };
 }
 
-// Emulation der Go-`main`-Funktion
-function main() {
-  // Go: x, y := 10, 20
-  // Um Swap mit Primitiven zu verwenden, müssen wir sie in Ptr-Objekte einpacken.
-  let x: Ptr<number> = { value: 10 };
-  let y: Ptr<number> = { value: 20 };
-
-  // Go: Swap(&x, &y)
-  Swap(x, y);
-
-  // Go: fmt.Println(x, y) // 20 10
-  console.log(x.value, y.value); // Erwartet: 20 10
-
-  // Go: n := 5
-  let n = 5;
-
-  // Go: fmt.Println(Double(n), n) // 10 5
-  console.log(Double(n), n); // Erwartet: 10 5
+// func SwapWithRef[T any](p *Pair[T]) {
+//   p.First, p.Second = p.Second, p.First
+// }
+/**
+ * Tauscht die Felder First und Second eines Paares direkt (in-place).
+ * Diese Funktion mutiert das als Argument übergebene ursprüngliche Pair-Objekt,
+ * was Go's Pass-by-Pointer-Verhalten simuliert.
+ * @param p Das zu mutierende Pair-Objekt.
+ */
+function SwapWithRef<T>(p: Pair<T>): void {
+  // In TypeScript werden Objekte by Reference übergeben.
+  // Das direkte Modifizieren von Eigenschaften von 'p' mutiert das ursprüngliche Objekt.
+  const temp = p.First;
+  p.First = p.Second;
+  p.Second = temp;
 }
 
-// Ruft die main-Funktion auf, wenn das Skript ausgeführt wird
-main();
+// func main() {
+/**
+ * Hauptausführungsblock, der Go's `main` Funktion simuliert.
+ */
+(function main() {
+  // p := Pair[int]{First: 10, Second: 20}
+  const p: Pair<number> = { First: 10, Second: 20 };
+
+  // q := SwapWithCopy(p)
+  const q = SwapWithCopy(p);
+
+  // fmt.Println(p.First, p.Second) // 10 20 (unverändert!)
+  console.log(p.First, p.Second); // Erwartete Ausgabe: 10 20 (unverändert!)
+
+  // fmt.Println(q.First, q.Second) // 20 10 (neue Kopie)
+  console.log(q.First, q.Second); // Erwartete Ausgabe: 20 10 (neue Kopie)
+
+  // SwapWithPlace(&p) // Anmerkung: Es wird angenommen, dass SwapWithRef hier gemeint ist, basierend auf der Funktionsdefinition.
+  SwapWithRef(p);
+
+  // fmt.Println(p.First, p.Second) // 20 10 (mutiert)
+  console.log(p.First, p.Second); // Erwartete Ausgabe: 20 10 (mutiert)
+})(); // Sofort aufgerufene Funktionsausdruck (IIFE) zur Simulation der Go-Hauptausführung.

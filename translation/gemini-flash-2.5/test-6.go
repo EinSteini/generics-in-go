@@ -1,60 +1,58 @@
 package main
 
-import (
-	"fmt"
-	"golang.org/x/exp/constraints" // Benötigt Go 1.18+ für Generics-Constraints
-)
+import "fmt" // Benötigt für fmt.Println
 
-// Ptr[T] repräsentiert eine generische, zeigerähnliche Struktur,
-// die einen Wert des Typs T enthält.
-// Dies entspricht dem TypeScript-Objekt { value: T }.
-type Ptr[T any] struct {
-	Value T
+// interface Pair<T> {
+//   First: T;
+//   Second: T;
+// }
+// Eine generische Struktur, die zwei Werte des gleichen Typs speichert.
+type Pair[T any] struct {
+	First  T
+	Second T
 }
 
-// Swap tauscht die Werte, die in zwei Ptr-Strukturen enthalten sind.
-// Die Funktion nimmt Zeiger auf Ptr-Strukturen entgegen,
-// um deren Inhalte direkt zu modifizieren, was dem Verhalten
-// von Objektreferenzen in TypeScript entspricht.
-func Swap[T any](a, b *Ptr[T]) {
-	// Original bleibt unverändert
-	// const temp = a.value;
-	temp := a.Value
-	// a.value = b.value;
-	a.Value = b.Value
-	// b.value = temp;
-	b.Value = temp
+// function SwapWithCopy<T>(p: Pair<T>): Pair<T> {
+//   return { First: p.Second, Second: p.First };
+// }
+// Tauscht die Elemente eines Paares und gibt ein *neues* Paar mit den getauschten Werten zurück.
+// Das ursprüngliche Paar wird nicht verändert.
+func SwapWithCopy[T any](p Pair[T]) Pair[T] {
+	return Pair[T]{First: p.Second, Second: p.First}
 }
 
-// Double verdoppelt einen numerischen Wert.
-// Der Typ-Parameter T muss ein numerischer Typ sein (Ganzzahl oder Gleitkommazahl).
-// 'constraints.Signed | constraints.Unsigned | constraints.Float' deckt alle
-// Standard-Go-Zahlentypen ab, auf denen Multiplikationen sinnvoll sind,
-// ähnlich wie 'extends number' in TypeScript.
-func Double[T constraints.Signed | constraints.Unsigned | constraints.Float](v T) T {
-	// Original bleibt unverändert
-	return v * 2 // Original bleibt unverändert
+// function SwapWithRef<T>(p: Pair<T>): void {
+//   const temp = p.First;
+//   p.First = p.Second;
+//   p.Second = temp;
+// }
+// Tauscht die Elemente eines Paares *an Ort und Stelle* durch Modifikation des Originalpaares
+// über einen Zeiger.
+func SwapWithRef[T any](p *Pair[T]) { // Beachte den Zeiger '*' um die Originalstruktur zu modifizieren
+	temp := p.First
+	p.First = p.Second
+	p.Second = temp
 }
 
+// (function main() { ... })();
+// Der Hauptausführungsblock in Go.
 func main() {
-	// let x: Ptr<number> = { value: 10 };
-	// In Go verwenden wir einen Zeiger auf die Ptr-Struktur,
-	// um die Modifikation durch die Swap-Funktion zu ermöglichen,
-	// was dem Objektreferenzverhalten von TypeScript entspricht.
-	x := &Ptr[int]{Value: 10}
-	// let y: Ptr<number> = { value: 20 };
-	y := &Ptr[int]{Value: 20}
+	// const p: Pair<number> = { First: 10, Second: 20 };
+	p := Pair[int]{First: 10, Second: 20}
 
-	// Swap(x, y);
-	Swap(x, y)
+	// const q = SwapWithCopy(p);
+	q := SwapWithCopy(p)
 
-	// console.log(x.value, y.value); // Erwartet: 20 10
-	// Go dereferenziert x und y automatisch für den Feldzugriff (x.Value ist gültig für *Ptr[int]).
-	fmt.Println(x.Value, y.Value) // Erwartet: 20 10
+	// console.log(p.First, p.Second); // Erwartete Ausgabe: 10 20 (unverändert!)
+	fmt.Println(p.First, p.Second) // Erwartete Ausgabe: 10 20 (unverändert!)
 
-	// let n = 5;
-	n := 5
+	// console.log(q.First, q.Second);
+	fmt.Println(q.First, q.Second)
 
-	// console.log(Double(n), n); // Erwartet: 10 5
-	fmt.Println(Double(n), n) // Erwartet: 10 5
+	// SwapWithRef(p);
+	// Übergibt die Adresse von p, damit SwapWithRef es modifizieren kann.
+	SwapWithRef(&p)
+
+	// console.log(p.First, p.Second);
+	fmt.Println(p.First, p.Second)
 }

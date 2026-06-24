@@ -4,22 +4,31 @@ package main
 
 import "fmt"
 
-// Snippet 6: Call-by-value und Zeiger-Semantik
-// Testet: Generische Zeiger-Parameter, In-Place-Mutation vs. Value-Semantik
+// Snippet 6: Call-by-value vs. Call-by-pointer
+// Testet: Go kopiert Structs by-value, TS teilt Objekte by-reference
 
-func Swap[T any](a, b *T) {
-	*a, *b = *b, *a
+type Pair[T any] struct {
+	First, Second T
 }
 
-func Double[T ~int | ~float64](v T) T {
-	return v * 2 // Original bleibt unverändert
+// Call-by-value: mutiert nur die lokale Kopie, gibt neues Pair zurück
+func SwapCopy[T any](p Pair[T]) Pair[T] {
+	p.First, p.Second = p.Second, p.First
+	return p
+}
+
+// Call-by-pointer: mutiert das Original direkt
+func SwapInPlace[T any](p *Pair[T]) {
+	p.First, p.Second = p.Second, p.First
 }
 
 func main() {
-	x, y := 10, 20
-	Swap(&x, &y)
-	fmt.Println(x, y) // 20 10
+	p := Pair[int]{First: 10, Second: 20}
 
-	n := 5
-	fmt.Println(Double(n), n) // 10 5
+	q := SwapCopy(p)
+	fmt.Println(p.First, p.Second) // 10 20 (unverändert!)
+	fmt.Println(q.First, q.Second) // 20 10 (neue Kopie)
+
+	SwapInPlace(&p)
+	fmt.Println(p.First, p.Second) // 20 10 (mutiert)
 }

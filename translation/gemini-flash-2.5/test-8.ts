@@ -1,76 +1,93 @@
-// Go: type Dog struct{ Name string }
-// Im TypeScript wird eine Go-Struktur in der Regel als Klasse dargestellt.
-class Dog {
-    // Go: Name string
-    // Die öffentliche Eigenschaft 'Name' wird direkt im Konstruktor deklariert.
-    constructor(public Name: string) {}
+// type Container[T any] struct {
+//   items []T
+// }
 
-    // Go: func (d Dog) String() string { return d.Name }
-    // Die Go-Methode 'String()' wird in TypeScript/JavaScript typischerweise als 'toString()' implementiert,
-    // um die standardmäßige String-Repräsentation eines Objekts zu liefern.
-    toString(): string {
-        return this.Name;
-    }
+/**
+ * Container ist eine generische Struktur (in TypeScript eine Klasse), die
+ * ein Slice (in TypeScript ein Array) von Elementen des Typs T enthält.
+ *
+ * @template T Der Typ der im Container gespeicherten Elemente.
+ */
+class Container<T> {
+  // items []T
+  public items: T[];
+
+  /**
+   * Erstellt eine neue Container-Instanz.
+   * @param items Ein optionales Array von Elementen, um den Container zu initialisieren.
+   *              Standardmäßig ein leeres Array.
+   */
+  constructor(items: T[] = []) {
+    this.items = items;
+  }
 }
 
-// Go: func Describe(v any) string
-// 'any' in Go wird hier als 'unknown' übersetzt, was typisch für TypeScript ist,
-// wenn der Typ zur Laufzeit bestimmt wird. Dies erfordert explizite Typ-Guards.
-function Describe(v: unknown): string {
-    // Go: switch val := v.(type) {
-    // In TypeScript werden Typ-Switches durch 'if-else if'-Ketten mit Typ-Guards realisiert.
+// func Map[T any, U any](c Container[T], f func(T) U) Container[U] {
+//   result := Container[U]{items: make([]U, len(c.items))}
+//   for i, v := range c.items {
+//     result.items[i] = f(v)
+//   }
+//   return result
+// }
 
-    // Go: case bool:
-    if (typeof v === 'boolean') {
-        // TypeScript ist hier direkt äquivalent zur Go-Logik.
-        if (v) {
-            return "YES";
-        }
-        return "NO";
-    }
+/**
+ * Map transformiert einen Container vom Typ T in einen Container vom Typ U,
+ * indem eine Funktion `f` auf jedes Element angewendet wird.
+ *
+ * Diese Funktion ist generisch und funktioniert mit beliebigen Typen T und U.
+ *
+ * @template T Der Typ der Eingabeelemente.
+ * @template U Der Typ der Ausgabeelemente nach der Transformation.
+ * @param c Der Eingabe-Container vom Typ T.
+ * @param f Die Mapping-Funktion, die ein Element vom Typ T entgegennimmt
+ *          und ein Element vom Typ U zurückgibt.
+ * @returns Einen neuen Container vom Typ U mit den transformierten Elementen.
+ */
+function Map<T, U>(c: Container<T>, f: (value: T) => U): Container<U> {
+  // In Go: result := Container[U]{items: make([]U, len(c.items))}
+  // In TypeScript: Wir erstellen zuerst ein Array der benötigten Länge.
+  // Beachte: `new Array(length)` erstellt ein Array mit 'leeren' Slots.
+  // Die Go-Funktion `make` initialisiert mit Nullwerten, die jedoch
+  // im Loop sofort überschrieben werden. Dieser Ansatz ist daher
+  // semantisch äquivalent für das Endergebnis.
+  const resultItems: U[] = new Array<U>(c.items.length);
+  const result = new Container<U>(resultItems);
 
-    // Go: case int:
-    // Go's 'int' entspricht in TypeScript 'number'. Um die Semantik von 'int' (ganze Zahl) zu bewahren,
-    // wird 'Number.isInteger' verwendet.
-    if (typeof v === 'number' && Number.isInteger(v)) {
-        // Go: return fmt.Sprintf("#%d", val)
-        // String-Formatierung erfolgt idiomatisch mit Template-Literalen.
-        return `#${v}`;
-    }
+  // In Go: for i, v := range c.items { result.items[i] = f(v) }
+  // In TypeScript: Iteriere durch die Eingabeelemente und wende die Funktion an.
+  for (let i = 0; i < c.items.length; i++) {
+    result.items[i] = f(c.items[i]);
+  }
 
-    // Go: case Dog:
-    // Für benutzerdefinierte Typen wie 'Dog' verwenden wir 'instanceof' als Typ-Guard.
-    if (v instanceof Dog) {
-        // Go: return "Dog: " + val.Name
-        // String-Verkettung oder Template-Literale sind hier möglich.
-        return `Dog: ${v.Name}`;
-    }
-
-    // Go: default:
-    // Go: return fmt.Sprint(v)
-    // Die Funktion 'String(v)' in TypeScript ist eine gute Entsprechung zu Go's 'fmt.Sprint(v)'.
-    // Sie versucht, einen beliebigen Wert in eine Zeichenkette zu konvertieren.
-    // Für Objekte ruft sie 'v.toString()' auf, falls vorhanden.
-    // Für primitive Typen (String, Number, Boolean, Null, Undefined) gibt sie deren String-Repräsentation zurück.
-    return String(v);
+  return result;
 }
 
-// Go: func main() { ... }
-// Eine Hauptfunktion, die den Code ausführt.
-function main() {
-    // Go: fmt.Println(Describe(true))             // YES
-    console.log(Describe(true));
+// func main() {
+//   nums := Container[int]{items: []int{1, 2, 3}}
+//
+//   strs := Map(nums, func(n int) string {
+//     return fmt.Sprintf("%d!", n)
+//   })
+//   fmt.Println(strs.items) // [1! 2! 3!]
+// }
 
-    // Go: fmt.Println(Describe(42))               // #42
-    console.log(Describe(42));
+// Beispielanwendung, die den Container und die Map-Funktion demonstriert,
+// äquivalent zur `main`-Funktion in Go.
+function mainGoEquivalent(): void {
+  // Go: nums := Container[int]{items: []int{1, 2, 3}}
+  // TypeScript: Instanziierung des Containers mit Zahlen.
+  const nums = new Container<number>([1, 2, 3]);
+  console.log("Original numbers container:", nums.items); // Ausgabe: [ 1, 2, 3 ]
 
-    // Go: fmt.Println(Describe(Dog{Name: "Rex"})) // Dog: Rex
-    // Instanziierung der 'Dog'-Klasse.
-    console.log(Describe(new Dog("Rex")));
+  // Go: strs := Map(nums, func(n int) string { return fmt.Sprintf("%d!", n) })
+  // TypeScript: Aufruf von Map mit einer anonymen Funktion (Pfeilfunktion),
+  // um Zahlen in Strings umzuwandeln. fmt.Sprintf("%d!", n) ist äquivalent zu `${n}!` in TypeScript.
+  const strs = Map(nums, (n: number) => `${n}!`);
 
-    // Go: fmt.Println(Describe("hello"))          // hello
-    console.log(Describe("hello"));
+  // Go: fmt.Println(strs.items) // [1! 2! 3!]
+  // TypeScript: Ausgabe der Elemente des neuen Containers.
+  console.log("Mapped strings container:", strs.items); // Erwartete Ausgabe: [ '1!', '2!', '3!' ]
 }
 
-// Aufruf der Hauptfunktion, um das Programm zu starten.
-main();
+// Führt die äquivalente Go-Main-Funktion aus.
+mainGoEquivalent();

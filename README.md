@@ -127,7 +127,7 @@ In diesem Abschnitt werden daher mehrere Testbeispiele dargestellt, um die Bijek
 ### Testbeispiele
 
 Für die folgenden Testbeispiele wird jeweils zuerst der Go-Quellcode gezeigt und eine Vermutung formuliert, welche Probleme bei der Übersetzung in TypeScript-Quellcode auftreten könnten.
-Anschließend wird das LLM mit dem unten definierten Prompt zur Übersetzung und Rückübersetzung aufgefordert.
+Anschließend wird das LLMmit dem unten definierten Prompt zur Übersetzung und Rückübersetzung aufgefordert.
 
 Zwischen jeder Anfrage wird der Kontext zurückgesetzt, damit das Modell sich nicht an den vergangenen Nachrichten orientieren kann.
 Desweiteren werden Kommentare entfernt, welche auf die ursprüngliche Version hinweisen könnten.
@@ -152,6 +152,7 @@ func main() {
 ```
 
 **Vermutung:**
+
 Dieses Beispiel sollte problemlos übersetzbar sein.
 
 - `any` entspricht direkt TypeScript's generischem `<T>` ohne Constraint.
@@ -194,10 +195,10 @@ func main() {
 }
 ```
 
-**Beobachtungen:** Wie vermutet ist die Übersetzung nahezu bijektiv:
+**Beobachtungen:** 
 
-1. Die Semantik ist vollständig erhalten.
-2. Syntaktischer Unterschied: `for i := range result` (Original) → `for i := 0; i < n; i++` (Rückübersetzung). Funktional jedoch identisch.
+Wie vermutet ist die Übersetzung bis auf einige syntaktische Unterschiede (for-Schleife) übersetzbar.
+Insbesondere die generischen Komponenten konnten vollständig wiederhergestellt werden.
 
 ---
 
@@ -224,7 +225,8 @@ func main() {
 ```
 
 **Vermutung:**
-Hier werden mehrere Probleme erwartet:
+
+Hier können mehrere Probleme erwartet werden:
 
 1. **Operator-Constraint:**
    Go erlaubt `a + b` nur, weil das Type Set garantiert, dass alle enthaltenen Typen `+` unterstützen. Dabei wird `T` zur Compile-Zeit an einen einzigen konkreten Typ gebunden.
@@ -286,114 +288,114 @@ func main() {
 
 **Beobachtungen:**
 
-1. **TypeScript-Code kompiliert nicht:** `return a + b` mit `T extends number | string` erzeugt einen TypeScript-Fehler, da `a` und `b` unterschiedliche Typen sein könnten und somit der Rückgabetyp `T`nicht garantiert werden kann.
-2. **Tilde in Rückübersetzung vorhanden:** Überraschenderweise fügt das LLM bei der Rückübersetzung `~` hinzu (`~int | ~float32 | ~float64 | ~string`), obwohl TypeScript dieses Konzept nicht hat. Das LLM hat hier offenbar Go-Idiome angewandt.
-3. **`Meter` wird zu `int` statt `float64`:** Im Original ist `type Meter float64`, die Rückübersetzung erzeugt `type Meter int`. TypeScript's `number` ist nicht eindeutig auf `int` oder `float64` abbildbar.
-4. **Zusätzlicher Typ `float32`:** Die Rückübersetzung fügt `~float32` zum Constraint hinzu, das im Original nicht existiert.
-5. **Initialisierung geändert:** `var d1, d2 Meter = 10, 20` (Original) → `d1 := Meter(10)` (Rückübersetzung). Funktional äquivalent, aber syntaktisch verschieden.
+1. Die generische Type Constraint wurde wieder reproduziert, in TypeScript wurde sie wie erwartet mit einem `extends` modelliert.
+2. Der TypeScript-Code kompiliert nicht: `return a + b` mit `T extends number | string` erzeugt einen TypeScript-Fehler, da `a` und `b` unterschiedliche Typen sein könnten und somit der Rückgabetyp `T`nicht garantiert werden kann.
+3. Das LLM stellt bei der Rückübersetzung der Type Sets `~` wieder her, obwohl TypeScript dieses Konzept nicht hat. 
+4. Die Rückübersetzung fügt `~float32` zum Constraint hinzu, das im Original nicht existiert.
+5. `Meter` wird zu `int` statt `float64`.
 
 ---
 
 #### Call-by-Value & Pointer vs. Call-by-Reference
 
-TODO Call-by-Reference kommt hier nicht so wirklich drin vor oder?
-
 ```go
-func Swap[T any](a, b *T) {
-	*a, *b = *b, *a
+type Pair[T any] struct {
+	First, Second T
 }
 
-func Double[T ~int | ~float64](v T) T {
-	return v * 2 // Original bleibt unverändert
+func SwapWithCopy[T any](p Pair[T]) Pair[T] {
+	p.First, p.Second = p.Second, p.First
+	return p
+}
+
+func SwapWithRef[T any](p *Pair[T]) {
+	p.First, p.Second = p.Second, p.First
 }
 
 func main() {
-	x, y := 10, 20
-	Swap(&x, &y)
-	fmt.Println(x, y) // 20 10
+	p := Pair[int]{First: 10, Second: 20}
 
-	n := 5
-	fmt.Println(Double(n), n) // 10 5
+	q := SwapWithCopy(p)
+	fmt.Println(p.First, p.Second) // 10 20 (unverändert!)
+	fmt.Println(q.First, q.Second) // 20 10 (neue Kopie)
+
+	SwapWithRef(&p)
+	fmt.Println(p.First, p.Second) // 20 10 (mutiert)
 }
 ```
 
-**Vermutung:** Dieses Beispiel ist problematisch für die Übersetzung:
+**Vermutung:** 
 
-1. **Zeiger-Parameter (`*T`):**
-   TypeScript hat keine Zeiger.
-   Das LLM muss entweder Wrapper-Objekte `{ value: T }` einführen oder die Signatur grundlegend ändern (z.B. Rückgabe eines Tupels statt In-Place-Mutation).
-2. **Semantischer Unterschied:**
-   In Go mutiert `Swap` die Originalvariablen über Zeiger.
-   In TypeScript gibt es keine Möglichkeit, primitive Werte (`number`) by-reference zu übergeben.
-   Die Übersetzung wird die Semantik entweder verändern oder einen Wrapper einführen, der im Original nicht existiert.
-3. **Rückübersetzung:**
-   Wenn das LLM einen Wrapper `{value: T}` in TypeScript erzeugt, wird die Rückübersetzung wahrscheinlich keinen Zeiger-Code rekonstruieren, sondern den Wrapper als Struct beibehalten.
-4. **Double:** Die Value-Semantik (`n` bleibt 5) ist in TypeScript automatisch gegeben, da primitive Typen ohnehin by-value übergeben werden. Hier sollte die Übersetzung korrekt sein.
+Dieses Beispiel ist aus hauptsächlich problematisch für die Übersetzung, da Go und TypeScript verschiedenes Standardverhalten bei der Parameterübergabe zeigen:
 
-#### Ergebnisse
+1. **`SwapCopy` (by-value):** In Go wird das Struct kopiert – `p` bleibt unverändert, nur die Rückgabe enthält die getauschten Werte. In TypeScript werden Objekte immer by-reference übergeben. Wenn das LLM die Funktion naiv übersetzt, mutiert sie das Original – die Value-Semantik geht verloren. Es müsste einen expliziten Clone einfügen.
+2. **`SwapInPlace` (by-pointer):** In TypeScript ist Mutation über Referenz der Default für Objekte – kein Zeiger nötig. Das LLM kann hier einfach das Objekt direkt mutieren. Die Frage ist, ob bei der Rückübersetzung der `*`-Parameter rekonstruiert wird.
+3. **Gegensätzliche Defaults:** Go arbeitet standardmäßig mit Pass-By-Value, TypeScript mit Pass-By-Reference. Was in Go zwei verschiedene Funktionen mit unterschiedlichem Verhalten sind, könnte in TypeScript zu zwei identisch wirkenden Funktionen werden.
+Wenn TypeScript keinen Clone für `SwapCopy` enthält, wird die Rückübersetzung wahrscheinlich auch keinen Value-Parameter (`Pair[T]`) rekonstruieren, sondern einen Pointer (`*Pair[T]`) – beide Funktionen werden dann identisch.
+
+#### Ergebnisse:
 
 **Go → TypeScript:**
 
 ```typescript
-type Ptr<T> = { value: T };
-
-function Swap<T>(a: Ptr<T>, b: Ptr<T>): void {
-  const temp = a.value;
-  a.value = b.value;
-  b.value = temp;
+interface Pair<T> {
+  First: T;
+  Second: T;
 }
 
-function Double<T extends number>(v: T): T {
-  return (v * 2) as T;
+function SwapWithCopy<T>(p: Pair<T>): Pair<T> {
+  return { First: p.Second, Second: p.First };
 }
 
-function main() {
-  let x: Ptr<number> = { value: 10 };
-  let y: Ptr<number> = { value: 20 };
-  Swap(x, y);
-  console.log(x.value, y.value); // 20 10
-
-  let n = 5;
-  console.log(Double(n), n); // 10 5
+function SwapWithRef<T>(p: Pair<T>): void {
+  const temp = p.First;
+  p.First = p.Second;
+  p.Second = temp;
 }
 
-main();
+(function main() {
+  const p: Pair<number> = { First: 10, Second: 20 };
+  const q = SwapWithCopy(p);
+  console.log(p.First, p.Second); 
+  console.log(q.First, q.Second);
+  SwapWithRef(p);
+  console.log(p.First, p.Second);
+})();
 ```
 
 **TypeScript → Go (Rückübersetzung):**
 
 ```go
-type Ptr[T any] struct {
-	Value T
+type Pair[T any] struct {
+	First  T
+	Second T
+}
+func SwapWithCopy[T any](p Pair[T]) Pair[T] {
+	return Pair[T]{First: p.Second, Second: p.First}
 }
 
-func Swap[T any](a, b *Ptr[T]) {
-	temp := a.Value
-	a.Value = b.Value
-	b.Value = temp
-}
-
-func Double[T constraints.Signed | constraints.Unsigned | constraints.Float](v T) T {
-	return v * 2
+func SwapWithRef[T any](p *Pair[T]) { 
+	temp := p.First
+	p.First = p.Second
+	p.Second = temp
 }
 
 func main() {
-	x := &Ptr[int]{Value: 10}
-	y := &Ptr[int]{Value: 20}
-	Swap(x, y)
-	fmt.Println(x.Value, y.Value) // 20 10
-	n := 5
-	fmt.Println(Double(n), n) // 10 5
+	p := Pair[int]{First: 10, Second: 20}
+	q := SwapWithCopy(p)
+	fmt.Println(p.First, p.Second);
+	fmt.Println(q.First, q.Second)
+	SwapWithRef(&p)
+	fmt.Println(p.First, p.Second)
 }
 ```
 
-**Beobachtungen:**
+**Beobachtungen**:
 
-1. **Wrapper-Objekt bestätigt:** Wie vermutet führt das LLM einen `Ptr<T>`-Typ mit `value`-Feld ein, da TypeScript keine Zeiger hat.
-2. **Semantik verändert:** Im Original ist `Swap[T any](a, b *T)` – direkte Zeiger auf Werte. Die Rückübersetzung erzeugt `Swap[T any](a, b *Ptr[T])` – Zeiger auf Wrapper-Structs. Der Aufrufer muss nun `Ptr`-Objekte erstellen statt einfach `&x` zu schreiben.
-3. **Nicht bijektiv:** Statt `*T` entsteht `*Ptr[T]` – ein strukturell anderes Programm.
-4. **Externe Abhängigkeit:** Die Rückübersetzung importiert `golang.org/x/exp/constraints` – eine externe Bibliothek, die im Original nicht benötigt wird. Der Inline-Constraint `~int | ~float64` wird durch `constraints.Signed | constraints.Unsigned | constraints.Float` ersetzt, was deutlich mehr Typen abdeckt.
-5. **Double korrekt:** Die Value-Semantik wird korrekt beibehalten.
+Insgesamt funktioniert die Übersetzung in diesem Beispiel überraschend gut, rein semantisch ist die Rückübersetzung fast äquivalent zum Original:
+
+1. Das LLM hat das Kernproblem verstanden und `SwapWithCopy` korrekt übersetzt: Statt das Objekt zu mutieren, gibt es ein neues Objekt zurück. Die Value-Semantik von Go wird dadurch in TypeScript bewahrt. Bei der Rückübersetzung erzeugt die Version des LLM allerdings ein weiteres Objekt, was nicht notwendig ist, das Ergebnis allerdings nicht verändert.
+2. Die Rückübersetzung rekonstruiert sowohl den Value-Parameter als auch den Pointer-Parameter korrekt. Das LLM könnte aus dem Muster und aus den Methodennamen erkannt haben, welche Go-Semantik gemeint ist.
 
 ---
 
@@ -419,13 +421,9 @@ func main() {
 }
 ```
 
-TODO: Das hier drunter noch besser als richtige Vermutungen fomulieren
+**Vermutung:** 
 
-**Vermutung:** Struct-Embedding hat kein direktes TypeScript-Äquivalent:
-
-1. **Embedding vs. Vererbung:** Das LLM muss zwischen `class Box<T> extends Named` (Vererbung) und Komposition (`name: Named`) wählen. Beides hat Nachteile: Vererbung ändert die Hierarchie, Komposition verliert den direkten Feldzugriff (`b.Name`).
-2. **Konstruktor:** Go's `NewBox`-Funktion wird wahrscheinlich zu einem `constructor` in einer TypeScript Klasse. Die Rückübersetzung sollte das zu einer `NewBox`-Funktion rekonstruieren.
-3. **Direkter Feldzugriff:** In Go kann man `b.Name` schreiben (promoted field). Bei Komposition in TypeScript wäre es `b.named.name`. Das LLM wird vermutlich Vererbung wählen, um diesen Zugriff zu erhalten.
+Das LLM muss für die Darstellung des Embeddings zwischen Vererbung und Komposition  wählen. Beides hat Nachteile: Vererbung ändert die Hierarchie und Komposition verliert den direkten Feldzugriff mit `b.Name`. Bei der Rückübersetzung könnte es zu Problemen kommen, gerade wenn das LLM die Strategie der Komposition wählt.
 
 #### Ergebnisse
 
@@ -484,25 +482,26 @@ func main() {
 }
 ```
 
-TODO stand beim ersten nicht auch "nahezu" bijektiv? ist das nicht quasi das gleiche wie "fast perfekt"?
-**Beobachtungen:** Dies ist das einzige Beispiel mit fast perfekter Bijektivität:
 
-1. **Vererbung gewählt:** Wie vermutet wählt das LLM `extends Named` statt Komposition, um den direkten Feldzugriff `b.Name` zu erhalten.
-2. **Rückübersetzung nahezu identisch:** Das Embedding wird korrekt rekonstruiert. `Named` wird wieder eingebettet, `NewBox` bleibt eine Funktion.
+**Beobachtungen:** 
+
+Das LLM wählt Vererbung statt Komposition, um den direkten Feldzugriff `b.Name` zu erhalten.
+Bei der Rückübersetzung zu Go kommt es entgegen dementsprechend nicht zu Problemen, da das LLM das Struct-Embedding auch im generischen Fall aus der Vererbung ableiten kann.
 
 ---
 
 #### Methoden mit eigenen Typparametern
+
+In Go ist es nicht möglich, dass Methoden mit generischer Signatur weitere generische Parameter einführen.
+In TypeScript ist dieses Verhalten möglich.
+Dieses Beispiel untersucht die Übersetzung und Rekonstruktion des dafür in Go genutzten Workarounds mit einer freistehenden Funktion.
+
 
 ```go
 type Container[T any] struct {
 	items []T
 }
 
-// Nicht möglich in Go: Methoden dürfen keine eigenen Typparameter einführen
-// func (c Container[T]) Map[U any](f func(T) U) Container[U] { ... }
-
-// Workaround: Top-Level-Funktion mit zwei Typparametern
 func Map[T any, U any](c Container[T], f func(T) U) Container[U] {
 	result := Container[U]{items: make([]U, len(c.items))}
 	for i, v := range c.items {
@@ -514,9 +513,6 @@ func Map[T any, U any](c Container[T], f func(T) U) Container[U] {
 func main() {
 	nums := Container[int]{items: []int{1, 2, 3}}
 
-	// Nicht möglich in Go:
-	// nums.Map(func(n int) string { return fmt.Sprintf("%d!", n) })
-
 	strs := Map(nums, func(n int) string {
 		return fmt.Sprintf("%d!", n)
 	})
@@ -526,9 +522,90 @@ func main() {
 
 **Vermutung:**
 
-1. **Workaround-Übersetzung:** Vermutlich wird das LLM versuchen den Workaround zu übersetzen, obwohl TypeScript eine Methode mit eigenen Typparametern unterstützen würde.
-2. **Rückübersetzung:** Da TypeScript die Methode `map<U>` direkt ausdrücken kann, wird das LLM beim Zurückübersetzen wahrscheinlich versuchen, `func (c Container[T]) Map[U any](...)` zu schreiben. Der Workaround als Top-Level-Funktion wird vermutlich nicht rekonstruiert.
-3. **Typinferenz:** Bei der Go→TS-Übersetzung sollte Typinferenz für `U` in beiden Richtungen funktionieren.
+1. Vermutlich wird das LLM versuchen den Workaround zu übersetzen, obwohl TypeScript eine Methode mit eigenen Typparametern unterstützen würde.
+2. Da TypeScript die Methode `map<U>` direkt ausdrücken kann, könnte das LLM beim Zurückübersetzen versuchen, `func (c Container[T]) Map[U any](...)` zu schreiben, was ungültiger Go-Code wäre.
+
+#### Ergebnisse:
+
+**Go → TypeScript:**
+
+```typescript
+class Container<T> {
+  public items: T[];
+  constructor(items: T[] = []) {
+    this.items = items;
+  }
+}
+
+function Map<T, U>(c: Container<T>, f: (value: T) => U): Container<U> {
+  const resultItems: U[] = new Array<U>(c.items.length);
+  const result = new Container<U>(resultItems);
+	.
+  for (let i = 0; i < c.items.length; i++) {
+    result.items[i] = f(c.items[i]);
+  }
+
+  return result;
+}
+
+function mainGoEquivalent(): void {
+  const nums = new Container<number>([1, 2, 3]);
+  console.log("Original numbers container:", nums.items); // Ausgabe: [ 1, 2, 3 ]
+
+  const strs = Map(nums, (n: number) => `${n}!`);
+  console.log("Mapped strings container:", strs.items); // Erwartete Ausgabe: [ '1!', '2!', '3!' ]
+}
+
+mainGoEquivalent();
+```
+
+**TypeScript → Go (Rückübersetzung):**
+
+```go
+type Container[T any] struct {
+	Items []T 
+}
+
+func NewContainer[T any](items []T) Container[T] {
+	if items == nil {
+		return Container[T]{Items: []T{}}
+	}
+	return Container[T]{Items: items}
+}
+
+func Map[T, U any](c Container[T], f func(value T) U) Container[U] {
+	resultItems := make([]U, len(c.Items))
+	result := NewContainer(resultItems) // Verwende NewContainer für Konsistenz
+
+	for i := 0; i < len(c.Items); i++ {
+		result.Items[i] = f(c.Items[i])
+	}
+
+	return result
+}
+
+func mainGoEquivalent() {
+	nums := NewContainer([]int{1, 2, 3})
+	fmt.Println("Original numbers container:", nums.Items) // Ausgabe: [1 2 3]
+
+	strs := Map(nums, func(n int) string {
+		return fmt.Sprintf("%d!", n)
+	})
+	fmt.Println("Mapped strings container:", strs.Items) // Erwartete Ausgabe: [1! 2! 3!]
+}
+
+func main() {
+	mainGoEquivalent()
+}
+```
+
+**Beobachtungen:**
+
+In diesem Beispiel wurde die Syntax durch die Übersetzunge teils stark verändert, allerdings bleibt die Übersetzung gerade bei den generischen Komponenten sehr konsistent. 
+
+1. Das LLM übersetzt `Map` als freistehende generische Funktion und es versucht nicht, eine Methode `container.map<U>(...)` daraus zu machen, obwohl TypeScript dies unterstützen würde. Die Struktur des Originals bleibt erhalten.
+2. Da TypeScript einen Constructor hat, erzeugt die Rückübersetzung eine `NewContainer`-Funktion, die im Original nicht existiert. Das Original initialisiert den Container direkt als Struct-Literal.
+3. `Map[T, U any]` mit zwei Typparametern und der Funktionsparameter `f func(T) U` werden in beiden Richtungen korrekt übersetzt. 
 
 ---
 
