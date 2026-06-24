@@ -1,5 +1,42 @@
 # Vergleich generischer Typparameter von Go und TypeScript
 
+## Zusammenfassung
+
+### Inhalt
+
+Diese Arbeit untersucht die Unterschiede und Äquivalenzen generischer Typparameter in Go und TypeScript.
+Zunächst werden dazu die Grundlagen generischer Programmierung in beiden Sprachen verglichen: Syntax der Typparameter (`[T any]` in Go vs. `<T>` in TypeScript), Constraints (`interface` mit Type Sets vs. `extends`), Typinferenz und die Positionen, an denen generische Typparameter im Code auftreten können (Funktionen, Structs/Klassen, Interfaces, Type Aliases, Methoden). 
+Dabei werden sowohl Gemeinsamkeiten als auch fundamentale Unterschiede herausgearbeitet. Zu zweiteren gehört, dass TypeScript Methoden mit eigenen Typparametern erlaubt, Go hingegen nicht, oder dass Go mit Type Sets und dem Tilde-Operator (`~`) ein mächtigeres Constraint-System besitzt.
+
+### Vorgehen
+
+Um die Äquivalenz der beiden Generics-Implementierungen zu prüfen, wird eine Untersuchung der Bijektivität durchgeführt: Fünf Go-Testbeispiele werden mithilfe des LLM „Gemini Flash 2.5" nach TypeScript übersetzt und das Ergebnis anschließend zurück nach Go übersetzt. Die Testfälle decken gezielt verschiedene Aspekte ab:
+
+1. **Generische Primitive** – Einfache generische Funktion mit Slice (`[]T` ↔ `T[]`)
+2. **Type Sets** – Interface-Constraint mit Tilde-Operator und Operator-Garantie (`~int | ~float64 | ~string`)
+3. **Pointer-Semantik** – Generischer Struct mit Call-by-Value vs. Call-by-Reference (`Pair[T]` vs. `*Pair[T]`)
+4. **Struct-Embedding** – Nicht-generisches Struct eingebettet in generisches Struct (Komposition vs. Vererbung)
+5. **Methoden mit eigenen Typparametern** – Go-Workaround mit freistehender Funktion (`Map[T, U any]`)
+
+Für jeden Testfall wird vorab eine Vermutung über mögliche Übersetzungsprobleme formuliert und anschließend mit dem tatsächlichen Ergebnis verglichen.
+
+### Ergebnisse
+
+Die Untersuchung zeigt ein differenziertes Bild:
+
+- **Generische Typparameter selbst sind robust übersetzbar:** Typparameter-Deklaration, Multi-Parameter-Generics, generische Structs/Klassen und Funktionsparameter mit generischen Typen werden in allen fünf Tests korrekt hin- und zurückübersetzt. Die Abbildung `[T any]` ↔ `<T>`, `[]T` ↔ `T[]` und `func(T) U` ↔ `(value: T) => U` ist verlustfrei.
+
+- **Type Sets und Operator-Constraints brechen die Bijektivität:** Go's `~int | ~float64 | ~string` wird zu TypeScript's `number | string` vereinfacht. Der Tilde-Operator und die nominale Typunterscheidung gehen verloren. TypeScript kann keine Operator-Unterstützung in Constraints ausdrücken, weshalb `a + b` einen Kompilierfehler erzeugt. Bei der Rückübersetzung halluziniert das LLM zusätzliche Typen.
+
+- **Pointer-Semantik wird durch Kontextwissen kompensiert:** Obwohl TypeScript keine Zeiger kennt, rekonstruiert das LLM die Value-/Pointer-Unterscheidung korrekt, vermutlich begünstigt durch explizite Funktionsnamen.
+
+- **Struct-Embedding wird über Vererbung abgebildet:** Das LLM wählt `extends` statt Komposition, wodurch der direkte Feldzugriff erhalten bleibt und die Rückübersetzung das Embedding korrekt rekonstruiert.
+
+- **Workarounds bleiben erhalten:** Das LLM behält Go's freistehende Funktion `Map[T, U any]` bei, obwohl TypeScript eine Methode `map<U>(...)` ermöglichen würde.
+
+**Gesamtfazit:** Die generischen Typparameter und ihre grundlegende Syntax sind zwischen Go und TypeScript in vielen Fällen bijektiv übersetzbar. Die Verluste entstehen dort, wo Go's Constraint-System (Type Sets, `~`, Operator-Garantien) über das hinausgeht, was TypeScript's `extends`-Constraints ausdrücken können. Umgekehrt werden TypeScript's zusätzliche Möglichkeiten (Methoden mit eigenen Typparametern) durch die Übersetzung nicht ausgeschöpft. Die Abbildung ist somit bijektiv für die Typparameter selbst, aber nicht für das umgebende Typsystem.
+
+
 ## 1. Einleitung
 
 Generische Programmierung ermöglicht es, Algorithmen und Datenstrukturen typunabhängig zu formulieren, ohne dabei auf Typsicherheit zu verzichten. Statt für jeden Typ eine eigene Implementierung zu schreiben, können allgemeine und wiederverwendbare Lösungen geschaffen werden.
