@@ -120,14 +120,14 @@ Die folgende Tabelle fasst zusammen, an welchen Stellen im Programmcode ein gene
 
 In Abschnitt 2 wurde gezeigt, dass Go und TypeScript generische Typparameter syntaktisch unterschiedlich verwenden, inhaltlich aber ähnliche Konzepte abbilden. Das wirft die Frage auf, ob eine Übersetzung zwischen beiden Sprachen bijektiv ist, d.h. ob eine Hin- und Rückübersetzung das ursprüngliche Ergebnis reproduzieren kann.
 
-Ein semantisch und strukturell identisches Ergebnis deutet dabei auf eine hohe Äquivalez in der Umsetzung der generischen Programmierung beider Sprachen hin. Abweichungen hingegen offenbaren grundlegende Unterschiede in den Typsystemen.
+Ein semantisch und strukturell identisches Ergebnis deutet dabei auf eine hohe Äquivalenz in der Umsetzung der generischen Programmierung beider Sprachen hin. Abweichungen hingegen offenbaren grundlegende Unterschiede in den Typsystemen.
 
 In diesem Abschnitt werden daher mehrere Testbeispiele dargestellt, um die Bijektivität der Übersetzung gestützt durch das LLM "Gemini Flash 2.5" zu untersuchen.
 
 ### Testbeispiele
 
 Für die folgenden Testbeispiele wird jeweils zuerst der Go-Quellcode gezeigt und eine Vermutung formuliert, welche Probleme bei der Übersetzung in TypeScript-Quellcode auftreten könnten.
-Anschließend wird das LLMmit dem unten definierten Prompt zur Übersetzung und Rückübersetzung aufgefordert.
+Anschließend wird das LLM mit dem unten definierten Prompt zur Übersetzung und Rückübersetzung aufgefordert.
 
 Zwischen jeder Anfrage wird der Kontext zurückgesetzt, damit das Modell sich nicht an den vergangenen Nachrichten orientieren kann.
 Desweiteren werden Kommentare entfernt, welche auf die ursprüngliche Version hinweisen könnten.
