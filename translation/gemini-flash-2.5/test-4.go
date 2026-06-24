@@ -2,25 +2,43 @@ package main
 
 import "fmt"
 
-// Repeat creates a slice containing the value 'v' repeated 'n' times.
-//
-// Equivalent to TypeScript:
-// export function Repeat<T>(v: T, n: number): T[] { ... }
-func Repeat[T any](v T, n int) []T {
-	// In Go, slices are typically initialized with make.
-	// make([]T, n) creates a slice of length 'n', with all elements
-	// initialized to their zero value. These will be immediately
-	// overwritten by the loop, making it functionally equivalent to
-	// TypeScript's `new Array(n)` for this purpose.
-	result := make([]T, n)
-
-	for i := 0; i < n; i++ {
-		result[i] = v
-	}
-	return result
+// Named represents an entity with a name.
+// This struct corresponds to the TypeScript 'Named' class.
+type Named struct {
+	Name string
 }
 
+// In Go, a struct's zero value handles the default constructor parameter
+// (e.g., Named{} results in Name: "", matching constructor(name: string = "")).
+// For the purpose of 'Box' embedding 'Named', we directly initialize 'Named' within 'NewBox'.
+
+// Box holds a value of any type T and is named.
+// It corresponds to the TypeScript 'Box<T>' class.
+// 'Named' is embedded, which is Go's way of achieving composition/inheritance,
+// promoting the 'Name' field directly to 'Box'.
+type Box[T any] struct {
+	Named // Embedded struct: provides the Name field and effectively "extends" Named.
+	Value T
+}
+
+// NewBox creates a new Box instance with a given name and value.
+// This generic function acts as the factory/constructor for Box[T],
+// mirroring both the TypeScript 'Box' constructor and the 'NewBox' factory function.
+func NewBox[T any](name string, value T) Box[T] {
+	// Initialize the embedded 'Named' struct.
+	// This corresponds to the 'super(name)' call in the TypeScript constructor.
+	return Box[T]{
+		Named: Named{Name: name}, // Initialize the embedded Named struct with the provided name.
+		Value: value,
+	}
+}
+
+// main function to demonstrate the usage.
+// Corresponds to the TypeScript 'main' function.
 func main() {
-	fmt.Println(Repeat("go", 3)) // Erwartete Ausgabe: [go go go]
-	fmt.Println(Repeat(42, 2))   // Erwartete Ausgabe: [42 42]
+	// Create a new Box instance with a string name and an integer value.
+	b := NewBox("answer", 42)
+	// Access the 'Name' field (promoted from the embedded 'Named' struct)
+	// and the 'Value' field.
+	fmt.Println(b.Name, b.Value) // Outputs: answer 42
 }

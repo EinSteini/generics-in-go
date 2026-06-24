@@ -1,41 +1,66 @@
 package main
 
-import "fmt"
+import (
+	"fmt" // Benötigt für das Drucken auf die Konsole und die String-Formatierung
+)
 
-// Addable repräsentiert Typen, die mit dem '+' Operator addiert oder verkettet werden können.
-// In TypeScript war dies `number | string`.
-// Der `~` Operator (Tilde) ermöglicht, dass benannte Typen (wie z.B. `Meter` unten),
-// deren zugrundeliegender Typ `int`, `float32`, `float64` oder `string` ist,
-// diese Schnittstellen-Constraint erfüllen.
-type Addable interface {
-	~int | ~float32 | ~float64 | ~string
+// Container ist eine generische Struktur, die ein Slice von Elementen vom Typ T enthält.
+// Entspricht der TypeScript-Klasse 'class Container<T>'.
+type Container[T any] struct {
+	Items []T // Öffentliches Feld, entspricht 'public items: T[]'
 }
 
-// Add ist eine generische Funktion, die zwei Werte desselben Addable-Typs addiert.
-// Der ursprüngliche TypeScript-Code enthielt den Kommentar "// throws error" neben `return a + b;`.
-// In Go ist der `+` Operator für Typen, die durch `Addable` eingeschränkt sind,
-// wohldefiniert (für String-Verkettung und numerische Addition). Daher führt diese Zeile
-// in Go nicht zu einem Kompilierungsfehler.
-func Add[T Addable](a, b T) T {
-	return a + b // Ursprünglicher TS-Kommentar: "// throws error". In Go ist dies gültig.
+// NewContainer erstellt einen neuen Container mit den gegebenen Elementen.
+// Dies dient als Äquivalent zum Konstruktor der TypeScript-Klasse.
+// Das Standard-leere Array aus dem TypeScript-Konstruktor wird durch
+// die Nil-Slice-Initialisierung von Go behandelt, falls keine Elemente bereitgestellt werden.
+func NewContainer[T any](items []T) Container[T] {
+	if items == nil {
+		// Wenn keine Elemente bereitgestellt werden, initialisiere mit einem leeren Slice
+		// für Konsistenz, obwohl ein Nil-Slice auch funktionieren würde.
+		return Container[T]{Items: []T{}}
+	}
+	return Container[T]{Items: items}
 }
 
-// Meter ist ein benannter Typ, basierend auf 'number' in TypeScript.
-// Hier verwenden wir 'int' als zugrundeliegenden Typ, da die Beispielwerte (10, 20) Ganzzahlen sind.
-// In TypeScript: `type Meter = number;`
-type Meter int
+// Map wendet eine Funktion 'f' auf jedes Element im Eingabe-Container 'c' an
+// und gibt einen neuen Container mit den Ergebnissen zurück.
+// Entspricht der TypeScript-Funktion 'function Map<T, U>(c: Container<T>, f: (value: T) => U): Container<U>'.
+func Map[T, U any](c Container[T], f func(value T) U) Container[U] {
+	// Erstelle einen neuen Slice zum Speichern der gemappten Ergebnisse, mit der gleichen Länge wie die Eingabe.
+	// Entspricht 'const resultItems: U[] = new Array<U>(c.items.length);'
+	resultItems := make([]U, len(c.Items))
 
+	// Erstelle einen neuen Container für die Ergebnisse, initialisiert mit dem resultItems-Slice.
+	// Entspricht 'const result = new Container<U>(resultItems);'
+	result := NewContainer(resultItems) // Verwende NewContainer für Konsistenz
+
+	// Iteriere über die Elemente im Eingabe-Container und wende die Mapping-Funktion an.
+	// Entspricht der TypeScript-For-Schleife.
+	for i := 0; i < len(c.Items); i++ {
+		result.Items[i] = f(c.Items[i])
+	}
+
+	return result
+}
+
+// mainGoEquivalent demonstriert die Verwendung von Container und Map in Go.
+// Entspricht der TypeScript-Funktion 'function mainGoEquivalent(): void'.
+func mainGoEquivalent() {
+	// Erstelle einen neuen Container von Integern.
+	// Entspricht 'const nums = new Container<number>([1, 2, 3]);'
+	nums := NewContainer([]int{1, 2, 3})
+	fmt.Println("Original numbers container:", nums.Items) // Ausgabe: [1 2 3]
+
+	// Mappe die Zahlen zu Strings, indem "!" an jede angehängt wird.
+	// Entspricht 'const strs = Map(nums, (n: number) => `${n}!`);'
+	strs := Map(nums, func(n int) string {
+		return fmt.Sprintf("%d!", n)
+	})
+	fmt.Println("Mapped strings container:", strs.Items) // Erwartete Ausgabe: [1! 2! 3!]
+}
+
+// main ist der Einstiegspunkt für das Go-Programm.
 func main() {
-	// console.log(Add(3, 4));         // 7
-	fmt.Println(Add(3, 4))
-
-	// console.log(Add("Go", "Lang")); // GoLang
-	fmt.Println(Add("Go", "Lang"))
-
-	// const d1: Meter = 10;
-	// const d2: Meter = 20;
-	// console.log(Add(d1, d2));       // 30 (benannter Typ dank ~)
-	d1 := Meter(10) // Explizite Konvertierung zum benannten Typ Meter
-	d2 := Meter(20)
-	fmt.Println(Add(d1, d2))
+	mainGoEquivalent()
 }

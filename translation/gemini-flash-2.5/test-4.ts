@@ -1,29 +1,55 @@
-/**
- * Repeats a given value `v` `n` times and returns an array containing these values.
- * This is a generic function, meaning it can work with any type `T`.
- *
- * @template T The type of the value to repeat.
- * @param v The value to repeat.
- * @param n The number of times to repeat the value.
- * @returns An array of type `T[]` containing `n` copies of `v`.
- */
-export function Repeat<T>(v: T, n: number): T[] {
-  // Erstelle ein Array vom Typ T mit der Länge n.
-  // In TypeScript erstellt `new Array(n)` ein Array mit 'n' undefinierten Elementen.
-  const result: T[] = new Array(n);
+// Named struct
+// In Go, a struct can be embedded. In TypeScript, we can model this with class inheritance
+// when the embedded struct primarily contributes fields that the embedding struct then "owns".
+// This approach maintains the same public API (e.g., `b.Name`) as in Go.
+class Named {
+  Name: string;
 
-  // Iteriere über die Indizes des Arrays.
-  for (let i = 0; i < n; i++) {
-    // Weise den bereitgestellten Wert 'v' jedem Element zu.
-    result[i] = v;
+  // The constructor initializes the Name property.
+  // In Go, `Named` fields are initialized when the embedding struct is created.
+  // Here, we provide a constructor to allow for this initialization.
+  constructor(name: string = "") {
+    this.Name = name;
   }
-  return result;
 }
 
-// Dies ist das Äquivalent der `main`-Funktion in Go.
-// In TypeScript werden Skripte typischerweise von oben nach unten ausgeführt.
+// Box is a generic struct that embeds Named and holds a value of type T.
+// type Box[T any] struct {
+//   Named
+//   Value T
+// }
+class Box<T> extends Named {
+  Value: T;
 
-// Beispielverwendung: Wiederhole den String "go" 3 Mal.
-console.log(Repeat("go", 3)); // Erwartete Ausgabe: [ 'go', 'go', 'go' ]
-// Beispielverwendung: Wiederhole die Zahl 42 2 Mal.
-console.log(Repeat(42, 2));   // Erwartete Ausgabe: [ 42, 42 ]
+  // The constructor for Box takes both name and value.
+  // It calls `super(name)` to initialize the inherited `Name` property
+  // and then initializes its own `Value` property.
+  constructor(name: string, value: T) {
+    super(name); // Pass the name to the base class constructor
+    this.Value = value;
+  }
+}
+
+// NewBox creates a new Box with a given name and value.
+// func NewBox[T any](name string, v T) Box[T] {
+//   return Box[T]{Named: Named{Name: name}, Value: v}
+// }
+function NewBox<T>(name: string, v: T): Box<T> {
+  // In Go, the `Named` embedded struct is explicitly initialized within the composite literal.
+  // In TypeScript, with class inheritance, the `Box` constructor handles
+  // both its own fields and the inherited fields by calling `super()`.
+  return new Box<T>(name, v);
+}
+
+// main function to demonstrate usage
+// func main() {
+//   b := NewBox("answer", 42)
+//   fmt.Println(b.Name, b.Value) // answer 42
+// }
+function main() {
+  const b = NewBox("answer", 42);
+  console.log(b.Name, b.Value); // Outputs: answer 42
+}
+
+// Call main to execute the example
+main();

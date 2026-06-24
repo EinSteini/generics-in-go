@@ -136,6 +136,8 @@ Desweiteren werden Kommentare entfernt, welche auf die ursprüngliche Version hi
 
 #### Generische Funktionsdefinition in Kombination mit generischen Primitiven
 
+Dieses Beispiel kombiniert einen generischen Typparameter `[T any]` mit Go's generischem Slice-Primitiv `[]T`. Beide Konzepte haben in  TypeScript direkte Entsprechungen (`<T>` und `T[]`), weshalb eine verlustfreie Übersetzung erwartet wird.
+
 ```go
 func Repeat[T any](v T, n int) []T {
 	result := make([]T, n)
@@ -203,6 +205,8 @@ Insbesondere die generischen Komponenten konnten vollständig wiederhergestellt 
 ---
 
 #### Type Sets in Go vs. Type Union in TypeScript
+
+Dieses Beispiel nutzt ein Interface-Constraint mit Type Set (`~int | ~float64 | ~string`) und den Tilde-Operator für benannte Typen. Dies sind Konzepte, die auf Go's Operator-Constraints und nominales Typsystem setzen und in TypeScript kein direktes Äquivalent haben.
 
 ```go
 type Addable interface {
@@ -297,6 +301,8 @@ func main() {
 ---
 
 #### Call-by-Value & Pointer vs. Call-by-Reference
+
+Dieses Beispiel verwendet einen generischen Struct `Pair[T]` mit Zeiger- und Wert-Übergabe (`*Pair[T]` vs. `Pair[T]`). Dies ist eine Unterscheidung, die in TypeScript nicht existiert, da Objekte stets per Referenz übergeben werden.
 
 ```go
 type Pair[T any] struct {
@@ -400,6 +406,8 @@ Insgesamt funktioniert die Übersetzung in diesem Beispiel überraschend gut, re
 ---
 
 #### Klassen (Struct-Embedding)
+
+Dieses Beispiel bettet ein nicht-generisches Struct (`Named`) in ein generisches Struct (`Box[T]`) ein. Dieses Kompositionsmuster ist in TypeScript nicht direkt umsetzbar, sodass bei der Übersetzung zwischen Vererbung und Komposition entschieden werden muss.
 
 ```go
 type Named struct {
@@ -611,13 +619,13 @@ In diesem Beispiel wurde die Syntax durch die Übersetzunge teils stark verände
 
 ### Zusammenfassung der Ergebnisse
 
-| Testfall                   | Bijektiv? | Hauptproblem                                                                      |
-| -------------------------- | --------- | --------------------------------------------------------------------------------- |
-| Generische Primitive       | ✅ Ja     | Nur syntaktische Unterschiede (Loop-Stil)                                         |
-| Type Sets                  | ❌ Nein   | TS-Code kompiliert nicht (`a + b`), `Meter` wird zu `int` statt `float64` |
-| Pointer/Call-by-value      | ❌ Nein   | Wrapper-Struct `Ptr[T]` statt Zeiger, externe Abhängigkeit eingefügt          |
-| Struct-Embedding           | ✅ Fast   | Nahezu identisch, nur Default-Parameter-Unterschied                               |
-| Methoden mit Typparametern | ❓ Offen  | Vermutung: Rückübersetzung erzeugt ungültigen Go-Code                          |
+| Testfall                   | Bijektiv? | Generics-Übersetzung                                                                                          |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------- |
+| Generische Primitive       | ✅ Ja      | `[T any]` ↔ `<T>` und `[]T` ↔ `T[]` verlustfrei übersetzt                                               |
+| Type Sets                  | ❌ Nein    | Type Set  verliert `~` und Operator-Constraint; TS kompiliert nicht |
+| Pointer/Call-by-value      | ✅ Fast    | `Pair[T]` und `*Pair[T]` korrekt als `Pair<T>` mit unterschiedlicher Semantik übersetzt                    |
+| Struct-Embedding           | ✅ Ja      | `Box[T]` mit Embedding → `Box<T> extends Named`; Generics vollständig rekonstruiert                         |
+| Methoden mit Typparametern | ✅ Fast    | `Map[T, U any]` mit `func(T) U` in beiden Richtungen korrekt übersetzt; Workaround bleibt erhalten          |
 
 ### Prompt für den Test
 
@@ -643,19 +651,18 @@ In diesem Beispiel wurde die Syntax durch die Übersetzunge teils stark verände
 
 ### Fazit
 
-Die Übersetzung zwischen Go und TypeScript Generics ist **nicht bijektiv** im strengen Sinne. Die Experimente zeigen ein klares Muster:
+Die Übersetzung zwischen Go und TypeScript Generics ist **nicht bijektiv** im strengen Sinne. Die Experimente zeigen jedoch ein differenziertes Bild:
 
-**Wann klappt's?**
-TODO die nummern hier passen nicht zu den oben beschriebenen beispielen (also da sind keine 7 stück und das erste gehört zu test 4)
+**Generische Typparameter selbst sind robust übersetzbar:**
 
-- Einfache generische Funktionen mit `any`-Constraint sind nahezu perfekt übersetzbar (Test 4).
-- Struct-Embedding ↔ Klassen-Vererbung funktioniert gut, solange keine Pointer-/Value-Semantik involviert ist (Test 7).
-- Die grundlegende Struktur (Typparameter, Funktionssignaturen, generische Container) wird in allen Fällen korrekt übertragen.
+- `[T any]` ↔ `<T>`, `[T, U any]` ↔ `<T, U>` und generische Structs wie `Pair[T]` ↔ `Pair<T>` werden in allen fünf Tests korrekt hin- und zurückübersetzt.
+- Generische Primitive (`[]T` ↔ `T[]`) und Funktionsparameter (`func(T) U` ↔ `(value: T) => U`) werden verlustfrei abgebildet.
+- Auch komplexere Muster wie Multi-Parameter-Generics (`Map[T, U any]`) und generische Konstruktorfunktionen (`NewBox[T any]`) bleiben strukturell erhalten.
 
-**Wann geht's schief?**
+**Probleme entstehen bei den Constraints und dem Typsystem, nicht bei den Typparametern:**
 
-- **Type Sets mit Operatoren**: TypeScript kann Operator-Constraints nicht ausdrücken. Der generierte Code kompiliert teilweise nicht, und der Tilde-Operator (`~`) sowie benannte Typen gehen bei der Hinübersetzung verloren.
-- **Zeiger-Semantik**: Da TypeScript keine Zeiger hat, entstehen Wrapper-Structs, die bei der Rückübersetzung nicht zu einfachen Zeigern rekonstruiert werden. Die Aufruf-Semantik ändert sich grundlegend.
-- **Type Switches mit Struct-Typen**: Die Unterschiede zwischen Go's nominalem Typsystem und TypeScript's strukturellem Typsystem werden sichtbar. `typeof` funktioniert nur für Primitive; für Structs braucht es `instanceof`, was zu `*Dog` statt `Dog` führt. Zusätzlich erzeugt die Rückübersetzung eine Explosion an Integer-Cases, da TypeScript's `number` nicht eindeutig auf einen Go-Typ abbildbar ist.
+- **Type Sets mit Operatoren** (Test 2): Das Interface-Constraint `~int | ~float64 | ~string` wird zu `number | string` vereinfacht. Der Tilde-Operator (`~`) und die damit verbundene nominale Typunterscheidung gehen verloren. Zudem kann TypeScript keine Operator-Unterstützung in Constraints ausdrücken, weshalb `a + b` einen Kompilierfehler erzeugt. Bei der Rückübersetzung halluziniert das LLM zusätzliche Typen (`~float32`) und ändert den Basistyp von `Meter`.
+- **Zeiger-Semantik** (Test 3): Obwohl `*Pair[T]` kein TypeScript-Äquivalent hat, erkennt das LLM das Muster und rekonstruiert die Pointer-/Value-Unterscheidung korrekt. Dies gelingt jedoch vermutlich nur durch die sprechenden Funktionsnamen (`SwapWithCopy` vs. `SwapWithRef`).
+- **Workaround-Erhaltung** (Test 5): Go's Einschränkung, dass Methoden keine eigenen Typparameter haben dürfen, führt zum Workaround mit freistehenden Funktionen. Das LLM erhält diesen Workaround bei der Übersetzung, obwohl TypeScript eine Methode `map<U>(...)` ermöglichen würde.
 
-**Allgemein:** Die Abbildung ist bijektiv, wenn der Code ausschließlich Konzepte nutzt, die in beiden Sprachen strukturelle Äquivalente haben: generische Funktionen ohne Operator-Nutzung, einfache Constraints, und Datenstrukturen ohne Zeiger-Semantik. Sobald sprachspezifische Features involviert sind (Type Sets mit `~`, Zeiger, nominale Typunterscheidung), ist die Rückübersetzung nicht mehr äquivalent zum Original.
+**Allgemein:** Die generischen Typparameter und ihre Syntax sind zwischen Go und TypeScript nahezu bijektiv übersetzbar. Die Verluste entstehen dort, wo Go's Constraint-System (Type Sets, `~`, Operator-Garantien) über das hinausgeht, was TypeScript's `extends`-Constraints ausdrücken können. Die Abbildung ist somit bijektiv für die Typparameter selbst, aber nicht für das umgebende Typsystem.
