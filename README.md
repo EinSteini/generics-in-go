@@ -2,40 +2,24 @@
 
 ## Zusammenfassung
 
-### Inhalt
+Diese Arbeit untersucht die Unterschiede und Äquivalenzen generischer Typparameter in Go und TypeScript. Verglichen werden Syntax, Constraints und die Positionen, an denen Typparameter auftreten können. Dabei zeigen sich sowohl Gemeinsamkeiten als auch fundamentale Unterschiede: Beispielsweise erlaubt TypeScript Methoden mit eigenen Typparametern, Go hingegen nicht, und Go besitzt mit Type Sets und dem Tilde-Operator (`~`) ein ausdrucksstärkeres Constraint-System.
 
-Diese Arbeit untersucht die Unterschiede und Äquivalenzen generischer Typparameter in Go und TypeScript.
-Zunächst werden dazu die Grundlagen generischer Programmierung in beiden Sprachen verglichen: Syntax der Typparameter (`[T any]` in Go vs. `<T>` in TypeScript), Constraints (`interface` mit Type Sets vs. `extends`), Typinferenz und die Positionen, an denen generische Typparameter im Code auftreten können (Funktionen, Structs/Klassen, Interfaces, Type Aliases, Methoden). 
-Dabei werden sowohl Gemeinsamkeiten als auch fundamentale Unterschiede herausgearbeitet. Zu zweiteren gehört, dass TypeScript Methoden mit eigenen Typparametern erlaubt, Go hingegen nicht, oder dass Go mit Type Sets und dem Tilde-Operator (`~`) ein mächtigeres Constraint-System besitzt.
+Um die Bijektivität einer KI-gestützten Übersetzung zu untersuchen, werden fünf Go-Testbeispiele mithilfe des LLM „Gemini Flash 2.5" nach TypeScript und anschließend zurück nach Go übersetzt:
 
-### Vorgehen
+1. **Generische Primitive**: Einfache generische Funktion mit Slice (`[]T` ↔ `T[]`)
+2. **Type Sets**: Interface-Constraint mit Tilde-Operator und Operator-Garantie (`~int | ~float64 | ~string`)
+3. **Pointer-Semantik**: Generischer Struct mit Call-by-Value vs. Call-by-Reference (`Pair[T]` vs. `*Pair[T]`)
+4. **Struct-Embedding**: Nicht-generisches Struct eingebettet in generisches Struct (Komposition vs. Vererbung)
+5. **Methoden mit eigenen Typparametern**: Go-Workaround mit freistehender Funktion (`Map[T, U any]`)
 
-Um die Äquivalenz der beiden Generics-Implementierungen zu prüfen, wird eine Untersuchung der Bijektivität durchgeführt: Fünf Go-Testbeispiele werden mithilfe des LLM „Gemini Flash 2.5" nach TypeScript übersetzt und das Ergebnis anschließend zurück nach Go übersetzt. Die Testfälle decken gezielt verschiedene Aspekte ab:
+Die Ergebnisse zeigen ein differenziertes Bild:
 
-1. **Generische Primitive** – Einfache generische Funktion mit Slice (`[]T` ↔ `T[]`)
-2. **Type Sets** – Interface-Constraint mit Tilde-Operator und Operator-Garantie (`~int | ~float64 | ~string`)
-3. **Pointer-Semantik** – Generischer Struct mit Call-by-Value vs. Call-by-Reference (`Pair[T]` vs. `*Pair[T]`)
-4. **Struct-Embedding** – Nicht-generisches Struct eingebettet in generisches Struct (Komposition vs. Vererbung)
-5. **Methoden mit eigenen Typparametern** – Go-Workaround mit freistehender Funktion (`Map[T, U any]`)
+- **Generische Typparameter selbst sind robust übersetzbar:** Typparameter-Deklaration, generische Structs und Funktionen lassen sich in beiden Richtungen verlustfrei übersetzen.
+- **Type Sets brechen die Bijektivität:** Go's Tilde-Operator und Operator-Constraints lassen sich in TypeScript nicht ausdrücken und führen zu Kompilierfehlern.
+- **Pointer-Semantik wird durch Kontextwissen kompensiert:** Das LLM rekonstruiert die Value-/Pointer-Unterscheidung korrekt, vermutlich durch die sprechenden Funktionsnamen.
+- **TypeScript-Vorteile werden nicht ausgeschöpft:** Go-Workarounds bleiben bei der Übersetzung erhalten, obwohl TypeScript z.B. Methoden mit eigenen Typparametern ermöglichen würde.
 
-Für jeden Testfall wird vorab eine Vermutung über mögliche Übersetzungsprobleme formuliert und anschließend mit dem tatsächlichen Ergebnis verglichen.
-
-### Ergebnisse
-
-Die Untersuchung zeigt ein differenziertes Bild:
-
-- **Generische Typparameter selbst sind robust übersetzbar:** Typparameter-Deklaration, Multi-Parameter-Generics, generische Structs/Klassen und Funktionsparameter mit generischen Typen werden in allen fünf Tests korrekt hin- und zurückübersetzt. Die Abbildung `[T any]` ↔ `<T>`, `[]T` ↔ `T[]` und `func(T) U` ↔ `(value: T) => U` ist verlustfrei.
-
-- **Type Sets und Operator-Constraints brechen die Bijektivität:** Go's `~int | ~float64 | ~string` wird zu TypeScript's `number | string` vereinfacht. Der Tilde-Operator und die nominale Typunterscheidung gehen verloren. TypeScript kann keine Operator-Unterstützung in Constraints ausdrücken, weshalb `a + b` einen Kompilierfehler erzeugt. Bei der Rückübersetzung halluziniert das LLM zusätzliche Typen.
-
-- **Pointer-Semantik wird durch Kontextwissen kompensiert:** Obwohl TypeScript keine Zeiger kennt, rekonstruiert das LLM die Value-/Pointer-Unterscheidung korrekt, vermutlich begünstigt durch explizite Funktionsnamen.
-
-- **Struct-Embedding wird über Vererbung abgebildet:** Das LLM wählt `extends` statt Komposition, wodurch der direkte Feldzugriff erhalten bleibt und die Rückübersetzung das Embedding korrekt rekonstruiert.
-
-- **Workarounds bleiben erhalten:** Das LLM behält Go's freistehende Funktion `Map[T, U any]` bei, obwohl TypeScript eine Methode `map<U>(...)` ermöglichen würde.
-
-**Gesamtfazit:** Die generischen Typparameter und ihre grundlegende Syntax sind zwischen Go und TypeScript in vielen Fällen bijektiv übersetzbar. Die Verluste entstehen dort, wo Go's Constraint-System (Type Sets, `~`, Operator-Garantien) über das hinausgeht, was TypeScript's `extends`-Constraints ausdrücken können. Umgekehrt werden TypeScript's zusätzliche Möglichkeiten (Methoden mit eigenen Typparametern) durch die Übersetzung nicht ausgeschöpft. Die Abbildung ist somit bijektiv für die Typparameter selbst, aber nicht für das umgebende Typsystem.
-
+Insgesamt sind grundlegende generische Konzepte zwischen Go und TypeScript weitgehend bijektiv übersetzbar. Verluste entstehen dort, wo die Typsysteme der beiden Sprachen fundamental auseinandergehen.
 
 ## 1. Einleitung
 
@@ -49,7 +33,7 @@ Im Zentrum der generischen Programmierung steht das Konzept des **generischen Ty
 
 ```go
 func Print[T any](value T)  // T ist ungebunden
-Print[int](42)              // T wird zu int gebunden
+Print[int](42)        // T wird zu int gebunden
 ```
 
 Während generische Typparameter als Feature in Go erst mit Version 1.18 (2022) und in TypeScript mit Version 2.0 (2016) eingeführt wurden, sind mehrere eingebaute Primitive beider Sprachen bereits generisch definiert, u.a.:
@@ -374,7 +358,7 @@ Dieses Beispiel ist hauptsächlich problematisch für die Übersetzung, da Go un
 1. **`SwapCopy` (by-value):** In Go wird das Struct kopiert, `p` bleibt also unverändert und nur die Rückgabe enthält die getauschten Werte. In TypeScript werden Objekte immer by-reference übergeben. Wenn das LLM die Funktion naiv übersetzt, mutiert sie das Original, wodurch die Value-Semantik verloren geht. Es müsste einen expliziten Clone einfügen.
 2. **`SwapInPlace` (by-pointer):** In TypeScript ist Mutation über Referenz der Default für Objekte, es sind also kein Zeiger nötig. Das LLM kann hier einfach das Objekt direkt mutieren. Die Frage ist, ob bei der Rückübersetzung der `*`-Parameter rekonstruiert wird.
 3. **Gegensätzliche Defaults:** Go arbeitet standardmäßig mit Pass-By-Value, TypeScript mit Pass-By-Reference. Was in Go zwei verschiedene Funktionen mit unterschiedlichem Verhalten sind, könnte in TypeScript zu zwei identisch wirkenden Funktionen werden.
-Wenn TypeScript keinen Clone für `SwapCopy` enthält, wird die Rückübersetzung wahrscheinlich auch keinen Value-Parameter (`Pair[T]`) rekonstruieren, sondern einen Pointer (`*Pair[T]`), sodass dann beide Funktionen identisch werden.
+   Wenn TypeScript keinen Clone für `SwapCopy` enthält, wird die Rückübersetzung wahrscheinlich auch keinen Value-Parameter (`Pair[T]`) rekonstruieren, sondern einen Pointer (`*Pair[T]`), sodass dann beide Funktionen identisch werden.
 
 #### Ergebnisse:
 
@@ -527,7 +511,6 @@ func main() {
 }
 ```
 
-
 **Beobachtungen:**
 
 Das LLM wählt Vererbung statt Komposition, um den direkten Feldzugriff `b.Name` zu erhalten.
@@ -540,7 +523,6 @@ Bei der Rückübersetzung zu Go kommt es dementsprechend nicht zu Problemen, da 
 In Go ist es nicht möglich, dass Methoden mit generischer Signatur weitere generische Parameter einführen.
 In TypeScript ist dieses Verhalten möglich.
 Dieses Beispiel untersucht die Übersetzung und Rekonstruktion des dafür in Go genutzten Workarounds mit einer freistehenden Funktion.
-
 
 ```go
 type Container[T any] struct {
@@ -656,13 +638,13 @@ In diesem Beispiel wurde die Syntax durch die Übersetzunge teils stark verände
 
 ### Zusammenfassung der Ergebnisse
 
-| Testfall                   | Bijektiv? | Generics-Übersetzung                                                                                          |
-| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------- |
-| Generische Primitive       | ✅ Ja      | `[T any]` ↔ `<T>` und `[]T` ↔ `T[]` verlustfrei übersetzt                                               |
-| Type Sets                  | ❌ Nein    | Type Set  verliert `~` und Operator-Constraint; TS kompiliert nicht |
-| Pointer/Call-by-value      | 🟡 Fast    | `Pair[T]` und `*Pair[T]` korrekt als `Pair<T>` mit unterschiedlicher Semantik übersetzt                    |
-| Struct-Embedding           | ✅ Ja      | `Box[T]` mit Embedding → `Box<T> extends Named`; Generics vollständig rekonstruiert                         |
-| Methoden mit Typparametern | 🟡 Fast    | `Map[T, U any]` mit `func(T) U` in beiden Richtungen korrekt übersetzt; Workaround bleibt erhalten          |
+| Testfall                   | Bijektiv? | Generics-Übersetzung                                                                                   |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+| Generische Primitive       | ✅ Ja     | `[T any]` ↔ `<T>` und `[]T` ↔ `T[]` verlustfrei übersetzt                                    |
+| Type Sets                  | ❌ Nein   | Type Set  verliert `~` und Operator-Constraint; TS kompiliert nicht                                   |
+| Pointer/Call-by-value      | 🟡 Fast   | `Pair[T]` und `*Pair[T]` korrekt als `Pair<T>` mit unterschiedlicher Semantik übersetzt          |
+| Struct-Embedding           | ✅ Ja     | `Box[T]` mit Embedding → `Box<T> extends Named`; Generics vollständig rekonstruiert               |
+| Methoden mit Typparametern | 🟡 Fast   | `Map[T, U any]` mit `func(T) U` in beiden Richtungen korrekt übersetzt; Workaround bleibt erhalten |
 
 ### Prompt für den Test
 
