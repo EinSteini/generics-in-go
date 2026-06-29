@@ -2,7 +2,8 @@
 
 ## Zusammenfassung
 
-Diese Arbeit untersucht die Unterschiede und Äquivalenzen generischer Typparameter in Go und TypeScript. Verglichen werden Syntax, Constraints und die Positionen, an denen Typparameter auftreten können. Dabei zeigen sich sowohl Gemeinsamkeiten als auch fundamentale Unterschiede: Beispielsweise erlaubt TypeScript Methoden mit eigenen Typparametern, Go hingegen nicht, und Go besitzt mit Type Sets und dem Tilde-Operator (`~`) ein ausdrucksstärkeres Constraint-System.
+Zunächst werden dazu die Grundlagen generischer Programmierung in beiden Sprachen verglichen: Syntax der Typparameter (`[T any]` in Go vs. `<T>` in TypeScript), Constraints (`interface` mit Type Sets vs. `extends`), Typinferenz und die Positionen, an denen generische Typparameter im Code auftreten können (Funktionen, Structs/Klassen, Interfaces, Type Aliases, Methoden). 
+Markante Unterschiede sind beispielsweise, dass TypeScript Methoden mit eigenen Typparametern erlaubt, Go hingegen nicht, oder dass Go mit Type Sets und dem Tilde-Operator (`~`) ein mächtigeres Constraint-System besitzt.
 
 Um die Bijektivität einer KI-gestützten Übersetzung zu untersuchen, werden fünf Go-Testbeispiele mithilfe des LLM „Gemini Flash 2.5" nach TypeScript und anschließend zurück nach Go übersetzt:
 
